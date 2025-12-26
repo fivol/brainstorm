@@ -1,6 +1,14 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import './App.css'
 
+// Recommended models from weakest/cheapest to strongest/most expensive
+const RECOMMENDED_MODELS = [
+  { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', label: 'Budget', description: 'Cheapest, good for simple tasks' },
+  { id: 'gpt-4o-mini', name: 'GPT-4o Mini', label: 'Best Value', description: 'Great price/performance balance' },
+  { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', label: 'Powerful', description: 'Strong performance, mid-range price' },
+  { id: 'gpt-4o', name: 'GPT-4o', label: 'Premium', description: 'Strongest, most capable' }
+]
+
 function App() {
   const [blocks, setBlocks] = useState([])
   const [activeBlockId, setActiveBlockId] = useState(null)
@@ -25,35 +33,41 @@ function App() {
       
       if (response.ok) {
         const data = await response.json()
-        // Filter for chat models (gpt-* models)
+        // Filter for chat completion models only (gpt-* models, exclude embeddings, fine-tuned, etc.)
         const chatModels = data.data
-          .filter(model => model.id.startsWith('gpt-'))
+          .filter(model => {
+            const id = model.id
+            // Include only chat completion models
+            return id.startsWith('gpt-') && 
+                   !id.includes('embedding') && 
+                   !id.includes('instruct') &&
+                   !id.includes(':') && // Exclude fine-tuned models (format: ft:gpt-3.5-turbo:org:model)
+                   (id.includes('gpt-3.5-turbo') || 
+                    id.includes('gpt-4') || 
+                    id.includes('gpt-4o'))
+          })
           .map(model => ({
             id: model.id,
             name: model.id
           }))
-          .sort((a, b) => a.id.localeCompare(b.id))
+          .sort((a, b) => {
+            // Sort by recommended order first, then alphabetically
+            const aIndex = RECOMMENDED_MODELS.findIndex(m => m.id === a.id)
+            const bIndex = RECOMMENDED_MODELS.findIndex(m => m.id === b.id)
+            if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex
+            if (aIndex !== -1) return -1
+            if (bIndex !== -1) return 1
+            return a.id.localeCompare(b.id)
+          })
         setOpenaiModels(chatModels)
       } else {
-        // If API call fails, use common models list
-        setOpenaiModels([
-          { id: 'gpt-4o', name: 'GPT-4o' },
-          { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
-          { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-          { id: 'gpt-4', name: 'GPT-4' },
-          { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
-        ])
+        // If API call fails, use recommended models list
+        setOpenaiModels(RECOMMENDED_MODELS.map(m => ({ id: m.id, name: m.name })))
       }
     } catch (error) {
       console.error('Failed to fetch OpenAI models:', error)
-      // Use common models list as fallback
-      setOpenaiModels([
-        { id: 'gpt-4o', name: 'GPT-4o' },
-        { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
-        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-        { id: 'gpt-4', name: 'GPT-4' },
-        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
-      ])
+      // Use recommended models list as fallback
+      setOpenaiModels(RECOMMENDED_MODELS.map(m => ({ id: m.id, name: m.name })))
     } finally {
       setLoadingModels(false)
     }
@@ -469,9 +483,29 @@ function App() {
                     <div className="loading-message">Loading models...</div>
                   )}
 
+                  {apiKey && (
+                    <div className="form-group">
+                      <label>Recommended Models</label>
+                      <div className="recommended-models">
+                        {RECOMMENDED_MODELS.map(model => (
+                          <button
+                            key={model.id}
+                            type="button"
+                            className={`recommended-model-button ${selectedModel === model.id ? 'selected' : ''}`}
+                            onClick={() => setSelectedModel(model.id)}
+                          >
+                            <div className="recommended-model-name">{model.name}</div>
+                            <div className="recommended-model-label">{model.label}</div>
+                            <div className="recommended-model-desc">{model.description}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {openaiModels.length > 0 && (
                     <div className="form-group">
-                      <label htmlFor="model">Model</label>
+                      <label htmlFor="model">All Available Models</label>
                       <select
                         id="model"
                         value={selectedModel}
