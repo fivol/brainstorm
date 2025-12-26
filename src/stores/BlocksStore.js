@@ -9,6 +9,7 @@ class BlocksStore {
   connections = [] // Array of { from: blockId, to: blockId }
   connectingFrom = null // blockId when user is dragging to create connection
   tempArrowEnd = null // { x, y } for temporary arrow while dragging
+  justFinishedConnecting = false // Flag to prevent canvas click after connection
 
   constructor() {
     makeAutoObservable(this)
@@ -27,8 +28,9 @@ class BlocksStore {
   }
 
   handleCanvasClick(e) {
-    // Don't create new nodes when connecting
-    if (this.connectingFrom) {
+    // Don't create new nodes when connecting or just finished connecting
+    if (this.connectingFrom || this.justFinishedConnecting) {
+      this.justFinishedConnecting = false
       return
     }
     
@@ -205,6 +207,14 @@ class BlocksStore {
               to: targetBlock.id
             })
           }
+          // Set flag to prevent canvas click from creating new block
+          this.justFinishedConnecting = true
+          // Reset flag after a short delay to allow normal clicks again
+          setTimeout(() => {
+            runInAction(() => {
+              this.justFinishedConnecting = false
+            })
+          }, 100)
         }
         this.connectingFrom = null
         this.tempArrowEnd = null

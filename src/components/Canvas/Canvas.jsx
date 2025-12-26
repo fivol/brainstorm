@@ -62,10 +62,9 @@ export const Canvas = observer(() => {
       const toBlock = blocksStore.blocks.find(b => b.id === connection.to)
       
       if (fromBlock && toBlock) {
-        const fromIsExpanded = fromBlock.isActive || fromBlock.id === blocksStore.hoveredBlockId
-        const toIsExpanded = toBlock.isActive || toBlock.id === blocksStore.hoveredBlockId
-        const fromDimensions = blocksStore.getBlockDimensionsFn(fromBlock, fromIsExpanded)
-        const toDimensions = blocksStore.getBlockDimensionsFn(toBlock, toIsExpanded)
+        // Use base dimensions (not expanded) for arrow calculations to prevent movement
+        const fromDimensions = blocksStore.getBlockDimensionsFn(fromBlock, false)
+        const toDimensions = blocksStore.getBlockDimensionsFn(toBlock, false)
         
         arrows.push(
           <Arrow
@@ -86,8 +85,8 @@ export const Canvas = observer(() => {
     if (blocksStore.connectingFrom && blocksStore.tempArrowEnd) {
       const fromBlock = blocksStore.blocks.find(b => b.id === blocksStore.connectingFrom)
       if (fromBlock) {
-        const fromIsExpanded = fromBlock.isActive || fromBlock.id === blocksStore.hoveredBlockId
-        const fromDimensions = blocksStore.getBlockDimensionsFn(fromBlock, fromIsExpanded)
+        // Use base dimensions for temporary arrow to prevent movement
+        const fromDimensions = blocksStore.getBlockDimensionsFn(fromBlock, false)
         
         arrows.push(
           <Arrow
