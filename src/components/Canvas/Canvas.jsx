@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect } from 'react'
+import React, { useMemo, useRef, useEffect, useState } from 'react'
 import { observer } from 'mobx-react-lite'
 import { TextBlock } from '../TextBlock'
 import { Arrow } from '../Arrow'
@@ -6,10 +6,41 @@ import { blocksStore } from '../../stores'
 
 export const Canvas = observer(() => {
   const canvasRef = useRef(null)
+  const [spacePressed, setSpacePressed] = useState(false)
 
   useEffect(() => {
     blocksStore.setCanvasRef(canvasRef.current)
   }, [])
+
+  // Handle space key for panning
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === ' ' && !blocksStore.connectingFrom) {
+        e.preventDefault()
+        setSpacePressed(true)
+        if (canvasRef.current) {
+          canvasRef.current.style.cursor = 'grab'
+        }
+      }
+    }
+
+    const handleKeyUp = (e) => {
+      if (e.key === ' ') {
+        setSpacePressed(false)
+        if (canvasRef.current && !blocksStore.isPanning) {
+          canvasRef.current.style.cursor = blocksStore.connectingFrom ? 'crosshair' : 'crosshair'
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('keyup', handleKeyUp)
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('keyup', handleKeyUp)
+    }
+  }, [blocksStore.connectingFrom, blocksStore.isPanning])
 
   const renderedBlocks = useMemo(() => {
     return blocksStore.blocks.map(block => {
@@ -113,22 +144,91 @@ export const Canvas = observer(() => {
     blocksStore.activeBlockId
   ])
 
+  const handleMouseDown = (e) => {
+    // Try to start panning (space key, middle mouse, or right mouse)
+    if (spacePressed || e.button === 1 || e.button === 2) {
+      if (blocksStore.startPan(e, spacePressed)) {
+        return
+      }
+    }
+    
+    // Handle normal canvas click (only if not panning)
+    if (!blocksStore.isPanning) {
+      blocksStore.handleCanvasClick(e)
+    }
+  }
+
+  const handleMouseMove = (e) => {
+    blocksStore.handleCanvasMouseMove(e)
+    
+    // Update cursor for panning
+    if (spacePressed || blocksStore.isPanning) {
+      if (canvasRef.current) {
+        canvasRef.current.style.cursor = blocksStore.isPanning ? 'grabbing' : 'grab'
+      }
+    }
+  }
+
+  const handleMouseUp = (e) => {
+    blocksStore.handleCanvasMouseUp(e)
+    
+    // Reset cursor if not panning
+    if (!blocksStore.isPanning && canvasRef.current) {
+      canvasRef.current.style.cursor = blocksStore.connectingFrom ? 'crosshair' : 'crosshair'
+    }
+  }
+
+  const handleWheel = (e) => {
+    // Only zoom if not connecting
+    if (!blocksStore.connectingFrom) {
+      blocksStore.handleZoom(e)
+    }
+  }
+
+  const handleContextMenu = (e) => {
+    // Prevent context menu when right-clicking for panning
+    if (blocksStore.isPanning) {
+      e.preventDefault()
+    }
+  }
+
+  const transformStyle = {
+    transform: `translate(${blocksStore.panX}px, ${blocksStore.panY}px) scale(${blocksStore.scale})`,
+    transformOrigin: '0 0',
+  }
+
   return (
     <div 
       ref={canvasRef}
-      className={`canvas ${blocksStore.connectingFrom ? 'connecting' : ''}`}
-      onClick={(e) => blocksStore.handleCanvasClick(e)}
-      onMouseMove={(e) => blocksStore.handleCanvasMouseMove(e)}
-      onMouseUp={(e) => blocksStore.handleCanvasMouseUp(e)}
+      className={`canvas ${blocksStore.connectingFrom ? 'connecting' : ''} ${blocksStore.isPanning ? 'panning' : ''}`}
+      onClick={(e) => {
+        if (!blocksStore.isPanning) {
+          blocksStore.handleCanvasClick(e)
+        }
+      }}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onWheel={handleWheel}
+      onContextMenu={handleContextMenu}
       onMouseLeave={(e) => {
         // Cancel connection if mouse leaves canvas
         if (blocksStore.connectingFrom) {
           blocksStore.handleCanvasMouseUp(e)
         }
+        // Stop panning if mouse leaves
+        if (blocksStore.isPanning) {
+          blocksStore.stopPan()
+        }
       }}
     >
-      {renderedArrows}
-      {renderedBlocks}
+      <div 
+        className="canvas-content"
+        style={transformStyle}
+      >
+        {renderedArrows}
+        {renderedBlocks}
+      </div>
     </div>
   )
 })

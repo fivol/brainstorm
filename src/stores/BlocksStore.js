@@ -10,6 +10,16 @@ class BlocksStore {
   connectingFrom = null // blockId when user is dragging to create connection
   tempArrowEnd = null // { x, y } for temporary arrow while dragging
   justFinishedConnecting = false // Flag to prevent canvas click after connection
+  
+  // Canvas pan and zoom
+  panX = 0 // Canvas pan offset X
+  panY = 0 // Canvas pan offset Y
+  scale = 1 // Canvas zoom scale
+  isPanning = false // Whether user is currently panning
+  panStartX = 0 // Starting X position when panning starts
+  panStartY = 0 // Starting Y position when panning starts
+  panStartOffsetX = 0 // Canvas offset X when panning starts
+  panStartOffsetY = 0 // Canvas offset Y when panning starts
 
   constructor() {
     makeAutoObservable(this)
@@ -29,15 +39,16 @@ class BlocksStore {
 
   handleCanvasClick(e) {
     // Don't create new nodes when connecting or just finished connecting
-    if (this.connectingFrom || this.justFinishedConnecting) {
+    if (this.connectingFrom || this.justFinishedConnecting || this.isPanning) {
       this.justFinishedConnecting = false
       return
     }
     
     if (e.target === this.canvasRef) {
       const rect = this.canvasRef.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
+      const screenX = e.clientX - rect.left
+      const screenY = e.clientY - rect.top
+      const { x, y } = this.screenToCanvas(screenX, screenY)
 
       const newBlock = {
         id: Date.now(),
@@ -140,6 +151,11 @@ class BlocksStore {
   }
 
   handleBlockMouseDown(e, blockId) {
+    // Don't start connection if panning
+    if (this.isPanning) {
+      return
+    }
+
     // Only start connection if not clicking on textarea or if block is not active
     const block = this.blocks.find(b => b.id === blockId)
     if (e.target.tagName !== 'TEXTAREA' && (!block || !block.isActive)) {
@@ -152,22 +168,40 @@ class BlocksStore {
   }
 
   handleCanvasMouseMove(e) {
+    // Handle panning
+    if (this.isPanning) {
+      this.updatePan(e)
+      return
+    }
+
+    // Handle connection dragging
     if (this.connectingFrom && this.canvasRef) {
       const rect = this.canvasRef.getBoundingClientRect()
+      const screenX = e.clientX - rect.left
+      const screenY = e.clientY - rect.top
+      // Convert to canvas coordinates (accounting for transform)
+      const canvasCoords = this.screenToCanvas(screenX, screenY)
       runInAction(() => {
         this.tempArrowEnd = {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top
+          x: canvasCoords.x,
+          y: canvasCoords.y
         }
       })
     }
   }
 
   handleCanvasMouseUp(e) {
+    // Stop panning
+    if (this.isPanning) {
+      this.stopPan()
+      return
+    }
+
     if (this.connectingFrom && this.canvasRef) {
       const rect = this.canvasRef.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const y = e.clientY - rect.top
+      const screenX = e.clientX - rect.left
+      const screenY = e.clientY - rect.top
+      const { x, y } = this.screenToCanvas(screenX, screenY)
 
       // Find which block (if any) the mouse was released over
       const targetBlock = this.blocks.find(block => {
@@ -227,6 +261,131 @@ class BlocksStore {
       this.connections = this.connections.filter(
         conn => !(conn.from === fromId && conn.to === toId)
       )
+    })
+  }
+
+  // Convert screen coordinates to canvas coordinates
+  screenToCanvas(x, y) {
+    return {
+      x: (x - this.panX) / this.scale,
+      y: (y - this.panY) / this.scale
+    }
+  }
+
+  // Convert canvas coordinates to screen coordinates
+  canvasToScreen(x, y) {
+    return {
+      x: x * this.scale + this.panX,
+      y: y * this.scale + this.panY
+    }
+  }
+
+  // Start panning
+  startPan(e, spacePressed = false) {
+    // Only pan with space key + drag, middle mouse button, or right mouse button
+    const canPan = spacePressed || e.button === 1 || e.button === 2
+    
+    if (!canPan) {
+      return false
+    }
+
+    // Don't pan if connecting or clicking on blocks
+    if (this.connectingFrom || (e.target && e.target.closest && e.target.closest('.text-block'))) {
+      return false
+    }
+
+    e.preventDefault()
+    runInAction(() => {
+      this.isPanning = true
+      this.panStartX = e.clientX
+      this.panStartY = e.clientY
+      this.panStartOffsetX = this.panX
+      this.panStartOffsetY = this.panY
+    })
+    return true
+  }
+
+  // Update pan position
+  updatePan(e) {
+    if (!this.isPanning) return
+
+    const deltaX = e.clientX - this.panStartX
+    const deltaY = e.clientY - this.panStartY
+
+    runInAction(() => {
+      this.panX = this.panStartOffsetX + deltaX
+      this.panY = this.panStartOffsetY + deltaY
+    })
+  }
+
+  // Stop panning
+  stopPan() {
+    runInAction(() => {
+      this.isPanning = false
+    })
+  }
+
+  // Handle zoom
+  handleZoom(e, zoomPoint = null) {
+    // Prevent default scrolling
+    e.preventDefault()
+
+    // Get zoom point (mouse position or center of canvas)
+    let pointX, pointY
+    if (zoomPoint) {
+      pointX = zoomPoint.x
+      pointY = zoomPoint.y
+    } else if (this.canvasRef) {
+      const rect = this.canvasRef.getBoundingClientRect()
+      pointX = e.clientX - rect.left
+      pointY = e.clientY - rect.top
+    } else {
+      pointX = window.innerWidth / 2
+      pointY = window.innerHeight / 2
+    }
+
+    // Calculate zoom delta
+    let delta = 0
+    if (e.type === 'wheel') {
+      // Check for pinch gesture (Ctrl key on macOS, or touchpad pinch)
+      if (e.ctrlKey || e.metaKey) {
+        // Pinch zoom - use deltaY directly
+        delta = -e.deltaY * 0.01
+      } else {
+        // Normal scroll zoom
+        delta = -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode === 2 ? 1 : 0.001)
+      }
+    } else if (e.type === 'gesturechange' || e.type === 'gestureend') {
+      // Handle pinch gesture (if supported)
+      delta = (e.scale - 1) * 0.1
+    }
+
+    // Calculate zoom factor (exponential for smooth zooming)
+    const zoomFactor = 1 + delta * 0.1
+    const newScale = Math.max(0.1, Math.min(5, this.scale * zoomFactor))
+
+    // Calculate the point in canvas coordinates before zoom
+    const canvasPoint = this.screenToCanvas(pointX, pointY)
+
+    // Update scale
+    runInAction(() => {
+      this.scale = newScale
+    })
+
+    // Adjust pan to keep the zoom point fixed
+    const newScreenPoint = this.canvasToScreen(canvasPoint.x, canvasPoint.y)
+    runInAction(() => {
+      this.panX += pointX - newScreenPoint.x
+      this.panY += pointY - newScreenPoint.y
+    })
+  }
+
+  // Reset pan and zoom
+  resetView() {
+    runInAction(() => {
+      this.panX = 0
+      this.panY = 0
+      this.scale = 1
     })
   }
 }
