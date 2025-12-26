@@ -12,6 +12,26 @@ export const Canvas = observer(() => {
     blocksStore.setCanvasRef(canvasRef.current)
   }, [])
 
+  // Add wheel event listener with passive: false to allow preventDefault
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const handleWheelNonPassive = (e) => {
+      // Only zoom if not connecting
+      if (!blocksStore.connectingFrom) {
+        blocksStore.handleZoom(e)
+      }
+    }
+
+    // Add event listener with passive: false
+    canvas.addEventListener('wheel', handleWheelNonPassive, { passive: false })
+
+    return () => {
+      canvas.removeEventListener('wheel', handleWheelNonPassive)
+    }
+  }, [blocksStore.connectingFrom])
+
   // Handle space key for panning
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -176,12 +196,7 @@ export const Canvas = observer(() => {
     }
   }
 
-  const handleWheel = (e) => {
-    // Only zoom if not connecting
-    if (!blocksStore.connectingFrom) {
-      blocksStore.handleZoom(e)
-    }
-  }
+  // Wheel handler removed - now handled by non-passive event listener in useEffect
 
   const handleContextMenu = (e) => {
     // Prevent context menu when right-clicking for panning
@@ -209,7 +224,6 @@ export const Canvas = observer(() => {
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
-      onWheel={handleWheel}
       onContextMenu={handleContextMenu}
       onMouseLeave={(e) => {
         // Cancel connection if mouse leaves canvas

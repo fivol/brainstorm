@@ -340,8 +340,10 @@ class BlocksStore {
 
   // Handle zoom
   handleZoom(e, zoomPoint = null) {
-    // Prevent default scrolling
-    e.preventDefault()
+    // Prevent default scrolling (only if event is not passive)
+    if (e.cancelable) {
+      e.preventDefault()
+    }
 
     // Get zoom point (mouse position or center of canvas)
     let pointX, pointY
