@@ -240,6 +240,9 @@ function App() {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
                   e.target.blur()
+                } else if (e.key === 'Escape') {
+                  e.preventDefault()
+                  e.target.blur()
                 }
               }}
               autoFocus
