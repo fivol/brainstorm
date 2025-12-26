@@ -44,7 +44,20 @@ class BlocksStore {
       return
     }
     
-    if (e.target === this.canvasRef) {
+    // Check if click is on canvas or canvas-content (not on a block)
+    const target = e.target
+    
+    // Check if clicked on a block
+    const clickedOnBlock = target.closest && target.closest('.text-block')
+    if (clickedOnBlock) {
+      return
+    }
+    
+    // Check if clicked on canvas-content or its children (arrows, etc.)
+    const clickedOnCanvasContent = target.closest && target.closest('.canvas-content')
+    const isCanvasRef = target === this.canvasRef
+    
+    if (clickedOnCanvasContent || isCanvasRef) {
       const rect = this.canvasRef.getBoundingClientRect()
       const screenX = e.clientX - rect.left
       const screenY = e.clientY - rect.top

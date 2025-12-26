@@ -152,10 +152,8 @@ export const Canvas = observer(() => {
       }
     }
     
-    // Handle normal canvas click (only if not panning)
-    if (!blocksStore.isPanning) {
-      blocksStore.handleCanvasClick(e)
-    }
+    // Don't handle click on mousedown - let onClick handle it
+    // This prevents double-firing
   }
 
   const handleMouseMove = (e) => {
@@ -202,7 +200,9 @@ export const Canvas = observer(() => {
       ref={canvasRef}
       className={`canvas ${blocksStore.connectingFrom ? 'connecting' : ''} ${blocksStore.isPanning ? 'panning' : ''}`}
       onClick={(e) => {
-        if (!blocksStore.isPanning) {
+        // Only handle clicks directly on canvas div, not on children
+        // Children (canvas-content) will handle their own clicks
+        if (!blocksStore.isPanning && e.target === canvasRef.current) {
           blocksStore.handleCanvasClick(e)
         }
       }}
@@ -225,6 +225,18 @@ export const Canvas = observer(() => {
       <div 
         className="canvas-content"
         style={transformStyle}
+        onClick={(e) => {
+          // Forward clicks on canvas-content (or SVG elements inside) to canvas click handler
+          // Only if not clicking on a block
+          if (!blocksStore.isPanning && !e.target.closest('.text-block')) {
+            // Create a synthetic event that will work with the handler
+            const syntheticEvent = {
+              ...e,
+              target: e.currentTarget
+            }
+            blocksStore.handleCanvasClick(syntheticEvent)
+          }
+        }}
       >
         {renderedArrows}
         {renderedBlocks}
