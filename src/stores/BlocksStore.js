@@ -340,6 +340,21 @@ class BlocksStore {
 
   // Handle zoom
   handleZoom(e, zoomPoint = null) {
+    // Check if this is a two-finger pan gesture (touchpad two-finger drag)
+    // On macOS trackpad: two-finger pan sends wheel events with deltaX/deltaY
+    // Pinch zoom sends deltaY with ctrl/meta key
+    if (e.type === 'wheel' && !e.ctrlKey && !e.metaKey) {
+      // If there's horizontal movement (deltaX), treat as two-finger pan
+      if (Math.abs(e.deltaX) > 0) {
+        this.handleTwoFingerPan(e)
+        if (e.cancelable) {
+          e.preventDefault()
+        }
+        return
+      }
+      // Pure vertical scroll (deltaY only) = zoom
+    }
+
     // Prevent default scrolling (only if event is not passive)
     if (e.cancelable) {
       e.preventDefault()
@@ -364,19 +379,19 @@ class BlocksStore {
     if (e.type === 'wheel') {
       // Check for pinch gesture (Ctrl key on macOS, or touchpad pinch)
       if (e.ctrlKey || e.metaKey) {
-        // Pinch zoom - use deltaY directly
-        delta = -e.deltaY * 0.01
+        // Pinch zoom - make it more responsive
+        delta = -e.deltaY * 0.02
       } else {
-        // Normal scroll zoom
-        delta = -e.deltaY * (e.deltaMode === 1 ? 0.05 : e.deltaMode === 2 ? 1 : 0.001)
+        // Normal scroll zoom - increase sensitivity
+        delta = -e.deltaY * (e.deltaMode === 1 ? 0.1 : e.deltaMode === 2 ? 2 : 0.002)
       }
     } else if (e.type === 'gesturechange' || e.type === 'gestureend') {
       // Handle pinch gesture (if supported)
-      delta = (e.scale - 1) * 0.1
+      delta = (e.scale - 1) * 0.2
     }
 
-    // Calculate zoom factor (exponential for smooth zooming)
-    const zoomFactor = 1 + delta * 0.1
+    // Calculate zoom factor (more aggressive for better responsiveness)
+    const zoomFactor = 1 + delta * 0.3
     const newScale = Math.max(0.1, Math.min(5, this.scale * zoomFactor))
 
     // Calculate the point in canvas coordinates before zoom
@@ -392,6 +407,23 @@ class BlocksStore {
     runInAction(() => {
       this.panX += pointX - newScreenPoint.x
       this.panY += pointY - newScreenPoint.y
+    })
+  }
+
+  // Handle two-finger panning (touchpad gesture)
+  handleTwoFingerPan(e) {
+    // Only pan if not connecting
+    if (this.connectingFrom) {
+      return
+    }
+
+    // Use deltaX and deltaY for panning
+    const deltaX = -e.deltaX
+    const deltaY = -e.deltaY
+
+    runInAction(() => {
+      this.panX += deltaX
+      this.panY += deltaY
     })
   }
 
