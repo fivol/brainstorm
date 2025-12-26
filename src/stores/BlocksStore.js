@@ -27,6 +27,11 @@ class BlocksStore {
   }
 
   handleCanvasClick(e) {
+    // Don't create new nodes when connecting
+    if (this.connectingFrom) {
+      return
+    }
+    
     if (e.target === this.canvasRef) {
       const rect = this.canvasRef.getBoundingClientRect()
       const x = e.clientX - rect.left
@@ -53,6 +58,12 @@ class BlocksStore {
 
   handleBlockClick(e, blockId) {
     e.stopPropagation()
+    
+    // Don't make block editable when connecting
+    if (this.connectingFrom) {
+      return
+    }
+    
     runInAction(() => {
       this.activeBlockId = blockId
       const updated = this.blocks.map(block =>
@@ -131,6 +142,7 @@ class BlocksStore {
     const block = this.blocks.find(b => b.id === blockId)
     if (e.target.tagName !== 'TEXTAREA' && (!block || !block.isActive)) {
       e.preventDefault()
+      e.stopPropagation()
       runInAction(() => {
         this.connectingFrom = blockId
       })
@@ -175,7 +187,19 @@ class BlocksStore {
             conn => conn.from === this.connectingFrom && conn.to === targetBlock.id
           )
           
+          // Check if reverse connection exists (bidirectional)
+          const reverseExists = this.connections.some(
+            conn => conn.from === targetBlock.id && conn.to === this.connectingFrom
+          )
+          
           if (!connectionExists) {
+            // If reverse exists, remove it and add both directions
+            if (reverseExists) {
+              this.connections = this.connections.filter(
+                conn => !(conn.from === targetBlock.id && conn.to === this.connectingFrom)
+              )
+            }
+            // Add the new connection
             this.connections.push({
               from: this.connectingFrom,
               to: targetBlock.id

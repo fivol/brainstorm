@@ -13,7 +13,7 @@
   border: 2px solid #3a3a3a;
   border-radius: 12px;
   padding: 8px 12px 12px 12px;
-  cursor: text;
+  cursor: pointer;
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   min-width: 100px;
@@ -24,8 +24,12 @@
   user-select: none;
 }
 
-.text-block.connecting {
-  cursor: crosshair;
+.text-block.active {
+  cursor: text;
+}
+
+.text-block.active .text-input {
+  cursor: text;
 }
 
 .text-block:hover {
@@ -66,6 +70,7 @@
   line-height: 1.6;
   overflow-y: auto;
   overflow-x: hidden;
+  cursor: text;
 }
 
 .text-display {
@@ -105,6 +110,7 @@
 .canvas.connecting .text-block {
   cursor: crosshair;
   user-select: none;
+  pointer-events: auto;
 }
 
 .floating-buttons {

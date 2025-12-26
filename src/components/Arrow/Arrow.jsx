@@ -9,7 +9,8 @@ export const Arrow = observer(({
   toDimensions,
   isTemporary = false,
   tempEnd = null,
-  arrowId = 'arrow'
+  arrowId = 'arrow',
+  isBidirectional = false
 }) => {
   let fromX, fromY, toX, toY, angle
 
@@ -48,16 +49,14 @@ export const Arrow = observer(({
     angle = points.angle
   }
 
-  // Arrow head size
-  const arrowHeadLength = 12
-  const arrowHeadWidth = 8
-
-  // Calculate arrow head points
-  const arrowHeadAngle = angle - Math.PI
-  const arrowHeadX1 = toX + arrowHeadLength * Math.cos(arrowHeadAngle - Math.PI / 6)
-  const arrowHeadY1 = toY + arrowHeadLength * Math.sin(arrowHeadAngle - Math.PI / 6)
-  const arrowHeadX2 = toX + arrowHeadLength * Math.cos(arrowHeadAngle + Math.PI / 6)
-  const arrowHeadY2 = toY + arrowHeadLength * Math.sin(arrowHeadAngle + Math.PI / 6)
+  // For bidirectional connections, use center-to-center line
+  if (isBidirectional && !isTemporary) {
+    fromX = fromBlock.x + fromDimensions.width / 2
+    fromY = fromBlock.y + fromDimensions.height / 2
+    toX = toBlock.x + toDimensions.width / 2
+    toY = toBlock.y + toDimensions.height / 2
+    angle = Math.atan2(toY - fromY, toX - fromX)
+  }
 
   return (
     <svg
@@ -72,20 +71,23 @@ export const Arrow = observer(({
       }}
     >
       <defs>
-        <marker
-          id={`arrowhead-${arrowId}`}
-          markerWidth="10"
-          markerHeight="10"
-          refX="9"
-          refY="3"
-          orient="auto"
-        >
-          <polygon
-            points="0 0, 10 3, 0 6"
-            fill="#646cff"
-            opacity={isTemporary ? 0.6 : 0.8}
-          />
-        </marker>
+        {!isBidirectional && (
+          <marker
+            id={`arrowhead-${arrowId}`}
+            markerWidth="8"
+            markerHeight="8"
+            refX="7"
+            refY="2.5"
+            orient="auto"
+            markerUnits="userSpaceOnUse"
+          >
+            <polygon
+              points="0 0, 8 2.5, 0 5"
+              fill="#646cff"
+              opacity={isTemporary ? 0.6 : 0.8}
+            />
+          </marker>
+        )}
         <linearGradient id={`arrowGradient-${arrowId}`} x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#646cff" stopOpacity="0.6" />
           <stop offset="100%" stopColor="#646cff" stopOpacity="0.9" />
@@ -99,7 +101,7 @@ export const Arrow = observer(({
         stroke={isTemporary ? '#646cff' : `url(#arrowGradient-${arrowId})`}
         strokeWidth={isTemporary ? 2 : 2.5}
         strokeOpacity={isTemporary ? 0.6 : 0.8}
-        markerEnd={`url(#arrowhead-${arrowId})`}
+        markerEnd={!isBidirectional ? `url(#arrowhead-${arrowId})` : undefined}
         style={{
           filter: isTemporary 
             ? 'drop-shadow(0 0 4px rgba(100, 108, 255, 0.4))'

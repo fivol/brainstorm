@@ -41,9 +41,23 @@ export const Canvas = observer(() => {
 
   const renderedArrows = useMemo(() => {
     const arrows = []
+    const processedPairs = new Set()
     
     // Render permanent connections
     blocksStore.connections.forEach(connection => {
+      const pairKey = [connection.from, connection.to].sort().join('-')
+      
+      // Check if this is a bidirectional connection
+      const isBidirectional = blocksStore.connections.some(
+        conn => conn.from === connection.to && conn.to === connection.from
+      )
+      
+      // Only process each pair once
+      if (processedPairs.has(pairKey)) {
+        return
+      }
+      processedPairs.add(pairKey)
+      
       const fromBlock = blocksStore.blocks.find(b => b.id === connection.from)
       const toBlock = blocksStore.blocks.find(b => b.id === connection.to)
       
@@ -55,13 +69,14 @@ export const Canvas = observer(() => {
         
         arrows.push(
           <Arrow
-            key={`${connection.from}-${connection.to}`}
-            arrowId={`${connection.from}-${connection.to}`}
+            key={pairKey}
+            arrowId={pairKey}
             fromBlock={fromBlock}
             toBlock={toBlock}
             fromDimensions={fromDimensions}
             toDimensions={toDimensions}
             isTemporary={false}
+            isBidirectional={isBidirectional}
           />
         )
       }
