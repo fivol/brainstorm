@@ -20,6 +20,7 @@ export const TextBlock = observer(({
         height: `${displayHeight}px`,
       }}
       onClick={(e) => blocksStore.handleBlockClick(e, block.id)}
+      onMouseDown={(e) => blocksStore.handleBlockMouseDown(e, block.id)}
       onMouseEnter={() => blocksStore.handleBlockMouseEnter(block.id)}
       onMouseLeave={() => blocksStore.handleBlockMouseLeave(block.id)}
     >

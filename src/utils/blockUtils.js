@@ -117,3 +117,61 @@ export const resolveCollisions = (
   return hasChanges ? updatedBlocks : blocksToResolve
 }
 
+// Calculate the best connection points between two blocks
+export const getArrowPoints = (
+  fromBlock,
+  toBlock,
+  fromDimensions,
+  toDimensions
+) => {
+  const fromCenterX = fromBlock.x + fromDimensions.width / 2
+  const fromCenterY = fromBlock.y + fromDimensions.height / 2
+  const toCenterX = toBlock.x + toDimensions.width / 2
+  const toCenterY = toBlock.y + toDimensions.height / 2
+
+  const dx = toCenterX - fromCenterX
+  const dy = toCenterY - fromCenterY
+  const angle = Math.atan2(dy, dx)
+
+  // Calculate intersection points on block edges
+  const fromHalfWidth = fromDimensions.width / 2
+  const fromHalfHeight = fromDimensions.height / 2
+  const toHalfWidth = toDimensions.width / 2
+  const toHalfHeight = toDimensions.height / 2
+
+  // Determine which edge of the from block the arrow starts from
+  let fromX, fromY
+  if (Math.abs(Math.cos(angle)) > Math.abs(Math.sin(angle))) {
+    // Horizontal edge
+    fromX = fromCenterX + (Math.cos(angle) > 0 ? fromHalfWidth : -fromHalfWidth)
+    fromY = fromCenterY + Math.tan(angle) * (fromX - fromCenterX)
+    // Clamp to vertical bounds
+    fromY = Math.max(fromBlock.y, Math.min(fromBlock.y + fromDimensions.height, fromY))
+  } else {
+    // Vertical edge
+    fromY = fromCenterY + (Math.sin(angle) > 0 ? fromHalfHeight : -fromHalfHeight)
+    fromX = fromCenterX + (fromY - fromCenterY) / Math.tan(angle)
+    // Clamp to horizontal bounds
+    fromX = Math.max(fromBlock.x, Math.min(fromBlock.x + fromDimensions.width, fromX))
+  }
+
+  // Determine which edge of the to block the arrow ends at
+  let toX, toY
+  const reverseAngle = angle + Math.PI
+  if (Math.abs(Math.cos(reverseAngle)) > Math.abs(Math.sin(reverseAngle))) {
+    // Horizontal edge
+    toX = toCenterX + (Math.cos(reverseAngle) > 0 ? toHalfWidth : -toHalfWidth)
+    toY = toCenterY + Math.tan(reverseAngle) * (toX - toCenterX)
+    // Clamp to vertical bounds
+    toY = Math.max(toBlock.y, Math.min(toBlock.y + toDimensions.height, toY))
+  } else {
+    // Vertical edge
+    toY = toCenterY + (Math.sin(reverseAngle) > 0 ? toHalfHeight : -toHalfHeight)
+    toX = toCenterX + (toY - toCenterY) / Math.tan(reverseAngle)
+    // Clamp to horizontal bounds
+    toX = Math.max(toBlock.x, Math.min(toBlock.x + toDimensions.width, toX))
+  }
+
+  return { fromX, fromY, toX, toY, angle }
+}
+

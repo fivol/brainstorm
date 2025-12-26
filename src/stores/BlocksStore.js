@@ -6,6 +6,9 @@ class BlocksStore {
   activeBlockId = null
   hoveredBlockId = null
   canvasRef = null
+  connections = [] // Array of { from: blockId, to: blockId }
+  connectingFrom = null // blockId when user is dragging to create connection
+  tempArrowEnd = null // { x, y } for temporary arrow while dragging
 
   constructor() {
     makeAutoObservable(this)
@@ -73,6 +76,10 @@ class BlocksStore {
       const block = this.blocks.find(b => b.id === blockId)
       if (!block || !block.text.trim()) {
         this.blocks = this.blocks.filter(b => b.id !== blockId)
+        // Remove all connections involving this block
+        this.connections = this.connections.filter(
+          conn => conn.from !== blockId && conn.to !== blockId
+        )
         return
       }
       const updated = this.blocks.map(b =>
@@ -113,6 +120,79 @@ class BlocksStore {
       this.blocks = []
       this.activeBlockId = null
       this.hoveredBlockId = null
+      this.connections = []
+      this.connectingFrom = null
+      this.tempArrowEnd = null
+    })
+  }
+
+  handleBlockMouseDown(e, blockId) {
+    // Only start connection if not clicking on textarea or if block is not active
+    const block = this.blocks.find(b => b.id === blockId)
+    if (e.target.tagName !== 'TEXTAREA' && (!block || !block.isActive)) {
+      e.preventDefault()
+      runInAction(() => {
+        this.connectingFrom = blockId
+      })
+    }
+  }
+
+  handleCanvasMouseMove(e) {
+    if (this.connectingFrom && this.canvasRef) {
+      const rect = this.canvasRef.getBoundingClientRect()
+      runInAction(() => {
+        this.tempArrowEnd = {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top
+        }
+      })
+    }
+  }
+
+  handleCanvasMouseUp(e) {
+    if (this.connectingFrom && this.canvasRef) {
+      const rect = this.canvasRef.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const y = e.clientY - rect.top
+
+      // Find which block (if any) the mouse was released over
+      const targetBlock = this.blocks.find(block => {
+        const isExpanded = block.isActive || block.id === this.hoveredBlockId
+        const { width, height } = this.getBlockDimensionsFn(block, isExpanded)
+        return (
+          x >= block.x &&
+          x <= block.x + width &&
+          y >= block.y &&
+          y <= block.y + height &&
+          block.id !== this.connectingFrom
+        )
+      })
+
+      runInAction(() => {
+        if (targetBlock) {
+          // Check if connection already exists
+          const connectionExists = this.connections.some(
+            conn => conn.from === this.connectingFrom && conn.to === targetBlock.id
+          )
+          
+          if (!connectionExists) {
+            this.connections.push({
+              from: this.connectingFrom,
+              to: targetBlock.id
+            })
+          }
+        }
+        this.connectingFrom = null
+        this.tempArrowEnd = null
+      })
+    }
+  }
+
+  removeConnection(fromId, toId) {
+    runInAction(() => {
+      this.connections = this.connections.filter(
+        conn => !(conn.from === fromId && conn.to === toId)
+      )
     })
   }
 }

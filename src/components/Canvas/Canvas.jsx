@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useEffect } from 'react'
 import { observer } from 'mobx-react-lite'
 import { TextBlock } from '../TextBlock'
+import { Arrow } from '../Arrow'
 import { blocksStore } from '../../stores'
 
 export const Canvas = observer(() => {
@@ -38,12 +39,81 @@ export const Canvas = observer(() => {
     })
   }, [blocksStore.blocks, blocksStore.hoveredBlockId, blocksStore.activeBlockId])
 
+  const renderedArrows = useMemo(() => {
+    const arrows = []
+    
+    // Render permanent connections
+    blocksStore.connections.forEach(connection => {
+      const fromBlock = blocksStore.blocks.find(b => b.id === connection.from)
+      const toBlock = blocksStore.blocks.find(b => b.id === connection.to)
+      
+      if (fromBlock && toBlock) {
+        const fromIsExpanded = fromBlock.isActive || fromBlock.id === blocksStore.hoveredBlockId
+        const toIsExpanded = toBlock.isActive || toBlock.id === blocksStore.hoveredBlockId
+        const fromDimensions = blocksStore.getBlockDimensionsFn(fromBlock, fromIsExpanded)
+        const toDimensions = blocksStore.getBlockDimensionsFn(toBlock, toIsExpanded)
+        
+        arrows.push(
+          <Arrow
+            key={`${connection.from}-${connection.to}`}
+            arrowId={`${connection.from}-${connection.to}`}
+            fromBlock={fromBlock}
+            toBlock={toBlock}
+            fromDimensions={fromDimensions}
+            toDimensions={toDimensions}
+            isTemporary={false}
+          />
+        )
+      }
+    })
+
+    // Render temporary arrow while connecting
+    if (blocksStore.connectingFrom && blocksStore.tempArrowEnd) {
+      const fromBlock = blocksStore.blocks.find(b => b.id === blocksStore.connectingFrom)
+      if (fromBlock) {
+        const fromIsExpanded = fromBlock.isActive || fromBlock.id === blocksStore.hoveredBlockId
+        const fromDimensions = blocksStore.getBlockDimensionsFn(fromBlock, fromIsExpanded)
+        
+        arrows.push(
+          <Arrow
+            key="temp-arrow"
+            arrowId="temp-arrow"
+            fromBlock={fromBlock}
+            toBlock={null}
+            fromDimensions={fromDimensions}
+            toDimensions={{ width: 0, height: 0 }}
+            isTemporary={true}
+            tempEnd={blocksStore.tempArrowEnd}
+          />
+        )
+      }
+    }
+
+    return arrows
+  }, [
+    blocksStore.connections,
+    blocksStore.blocks,
+    blocksStore.connectingFrom,
+    blocksStore.tempArrowEnd,
+    blocksStore.hoveredBlockId,
+    blocksStore.activeBlockId
+  ])
+
   return (
     <div 
       ref={canvasRef}
-      className="canvas" 
+      className={`canvas ${blocksStore.connectingFrom ? 'connecting' : ''}`}
       onClick={(e) => blocksStore.handleCanvasClick(e)}
+      onMouseMove={(e) => blocksStore.handleCanvasMouseMove(e)}
+      onMouseUp={(e) => blocksStore.handleCanvasMouseUp(e)}
+      onMouseLeave={(e) => {
+        // Cancel connection if mouse leaves canvas
+        if (blocksStore.connectingFrom) {
+          blocksStore.handleCanvasMouseUp(e)
+        }
+      }}
     >
+      {renderedArrows}
       {renderedBlocks}
     </div>
   )

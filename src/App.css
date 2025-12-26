@@ -21,6 +21,11 @@
   width: fit-content;
   min-height: 40px;
   box-sizing: border-box;
+  user-select: none;
+}
+
+.text-block.connecting {
+  cursor: crosshair;
 }
 
 .text-block:hover {
@@ -90,6 +95,16 @@
   font-size: 20px;
   font-weight: bold;
   color: rgba(255, 255, 255, 0.9);
+}
+
+/* Arrow connection styles */
+.canvas.connecting {
+  cursor: crosshair;
+}
+
+.canvas.connecting .text-block {
+  cursor: crosshair;
+  user-select: none;
 }
 
 .floating-buttons {
