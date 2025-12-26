@@ -204,6 +204,12 @@ function App() {
     })
   }, [resolveCollisions, activeBlockId])
 
+  const handleRemoveAll = useCallback(() => {
+    setBlocks([])
+    setActiveBlockId(null)
+    setHoveredBlockId(null)
+  }, [])
+
   const renderedBlocks = useMemo(() => {
     return blocks.map(block => {
       const isExpanded = block.isActive || block.id === hoveredBlockId
@@ -273,7 +279,20 @@ function App() {
       onClick={handleCanvasClick}
     >
       {renderedBlocks}
+      <div className="floating-buttons">
+        <button 
+          className="floating-button remove-all-button"
+          onClick={(e) => {
+            e.stopPropagation()
+            if (blocks.length > 0 && window.confirm('Remove all blocks?')) {
+              handleRemoveAll()
+            }
+          }}
+        >
+          Remove All
+        </button>
       </div>
+    </div>
   )
 }
 
