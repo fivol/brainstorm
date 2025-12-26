@@ -1,11 +1,86 @@
-import { useState, useRef, useCallback, useMemo } from 'react'
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react'
 import './App.css'
 
 function App() {
   const [blocks, setBlocks] = useState([])
   const [activeBlockId, setActiveBlockId] = useState(null)
   const [hoveredBlockId, setHoveredBlockId] = useState(null)
+  const [showModelModal, setShowModelModal] = useState(false)
+  const [selectedProvider, setSelectedProvider] = useState('')
+  const [selectedModel, setSelectedModel] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [openaiModels, setOpenaiModels] = useState([])
+  const [loadingModels, setLoadingModels] = useState(false)
+  const [currentModel, setCurrentModel] = useState(null)
   const canvasRef = useRef(null)
+
+  const fetchOpenAIModels = useCallback(async (key) => {
+    setLoadingModels(true)
+    try {
+      const response = await fetch('https://api.openai.com/v1/models', {
+        headers: {
+          'Authorization': `Bearer ${key}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        // Filter for chat models (gpt-* models)
+        const chatModels = data.data
+          .filter(model => model.id.startsWith('gpt-'))
+          .map(model => ({
+            id: model.id,
+            name: model.id
+          }))
+          .sort((a, b) => a.id.localeCompare(b.id))
+        setOpenaiModels(chatModels)
+      } else {
+        // If API call fails, use common models list
+        setOpenaiModels([
+          { id: 'gpt-4o', name: 'GPT-4o' },
+          { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+          { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+          { id: 'gpt-4', name: 'GPT-4' },
+          { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+        ])
+      }
+    } catch (error) {
+      console.error('Failed to fetch OpenAI models:', error)
+      // Use common models list as fallback
+      setOpenaiModels([
+        { id: 'gpt-4o', name: 'GPT-4o' },
+        { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
+        { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
+        { id: 'gpt-4', name: 'GPT-4' },
+        { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+      ])
+    } finally {
+      setLoadingModels(false)
+    }
+  }, [])
+
+  // Load model config from localStorage on mount
+  useEffect(() => {
+    const savedModel = localStorage.getItem('aiModelConfig')
+    if (savedModel) {
+      try {
+        const modelConfig = JSON.parse(savedModel)
+        setCurrentModel(modelConfig)
+      } catch (e) {
+        console.error('Failed to parse saved model config:', e)
+      }
+    }
+  }, [])
+
+  // Debounced fetch of OpenAI models when API key changes
+  useEffect(() => {
+    if (selectedProvider === 'openai' && apiKey && apiKey.length > 10 && !openaiModels.length && !loadingModels) {
+      const timeoutId = setTimeout(() => {
+        fetchOpenAIModels(apiKey)
+      }, 500)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [apiKey, selectedProvider, openaiModels.length, loadingModels, fetchOpenAIModels])
 
   const measureTextWidth = useCallback((text) => {
     const canvas = document.createElement('canvas')
@@ -210,6 +285,59 @@ function App() {
     setHoveredBlockId(null)
   }, [])
 
+  const handleOpenModelModal = useCallback(() => {
+    if (currentModel) {
+      setSelectedProvider(currentModel.provider)
+      setSelectedModel(currentModel.model)
+      setApiKey(currentModel.apiKey)
+      if (currentModel.provider === 'openai' && currentModel.apiKey) {
+        fetchOpenAIModels(currentModel.apiKey)
+      }
+    }
+    setShowModelModal(true)
+  }, [currentModel, fetchOpenAIModels])
+
+  const handleCloseModelModal = useCallback(() => {
+    setShowModelModal(false)
+    setSelectedProvider('')
+    setSelectedModel('')
+    setApiKey('')
+    setOpenaiModels([])
+    setLoadingModels(false)
+  }, [])
+
+  const handleProviderChange = useCallback((e) => {
+    setSelectedProvider(e.target.value)
+    setSelectedModel('')
+    setOpenaiModels([])
+    setLoadingModels(false)
+  }, [])
+
+  const handleSaveModel = useCallback(() => {
+    if (!selectedProvider || !selectedModel || !apiKey) {
+      alert('Please fill in all fields')
+      return
+    }
+
+    const modelConfig = {
+      provider: selectedProvider,
+      model: selectedModel,
+      apiKey: apiKey
+    }
+
+    localStorage.setItem('aiModelConfig', JSON.stringify(modelConfig))
+    setCurrentModel(modelConfig)
+    handleCloseModelModal()
+  }, [selectedProvider, selectedModel, apiKey, handleCloseModelModal])
+
+  const handleRemoveModel = useCallback(() => {
+    if (window.confirm('Remove current model configuration?')) {
+      localStorage.removeItem('aiModelConfig')
+      setCurrentModel(null)
+      handleCloseModelModal()
+    }
+  }, [handleCloseModelModal])
+
   const renderedBlocks = useMemo(() => {
     return blocks.map(block => {
       const isExpanded = block.isActive || block.id === hoveredBlockId
@@ -281,6 +409,15 @@ function App() {
       {renderedBlocks}
       <div className="floating-buttons">
         <button 
+          className="floating-button model-button"
+          onClick={(e) => {
+            e.stopPropagation()
+            handleOpenModelModal()
+          }}
+        >
+          {currentModel ? 'Change Model' : 'Add Model'}
+        </button>
+        <button 
           className="floating-button remove-all-button"
           onClick={(e) => {
             e.stopPropagation()
@@ -292,6 +429,96 @@ function App() {
           Remove All
         </button>
       </div>
+
+      {showModelModal && (
+        <div className="modal-overlay" onClick={handleCloseModelModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{currentModel ? 'Change Model' : 'Add Model'}</h2>
+              <button className="modal-close" onClick={handleCloseModelModal}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label htmlFor="provider">Provider</label>
+                <select
+                  id="provider"
+                  value={selectedProvider}
+                  onChange={handleProviderChange}
+                  className="form-input"
+                >
+                  <option value="">Select provider</option>
+                  <option value="openai">OpenAI</option>
+                </select>
+              </div>
+
+              {selectedProvider === 'openai' && (
+                <>
+                  <div className="form-group">
+                    <label htmlFor="api-key">API Key</label>
+                    <input
+                      id="api-key"
+                      type="password"
+                      value={apiKey}
+                      onChange={(e) => setApiKey(e.target.value)}
+                      placeholder="sk-..."
+                      className="form-input"
+                    />
+                  </div>
+
+                  {loadingModels && (
+                    <div className="loading-message">Loading models...</div>
+                  )}
+
+                  {openaiModels.length > 0 && (
+                    <div className="form-group">
+                      <label htmlFor="model">Model</label>
+                      <select
+                        id="model"
+                        value={selectedModel}
+                        onChange={(e) => setSelectedModel(e.target.value)}
+                        className="form-input"
+                      >
+                        <option value="">Select model</option>
+                        {openaiModels.map(model => (
+                          <option key={model.id} value={model.id}>
+                            {model.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="modal-actions">
+                {currentModel && (
+                  <button
+                    className="modal-button remove-button"
+                    onClick={handleRemoveModel}
+                  >
+                    Remove {currentModel.provider === 'openai' ? 'OpenAI' : currentModel.provider}
+                  </button>
+                )}
+                <div className="modal-actions-right">
+                  <button
+                    className="modal-button cancel-button"
+                    onClick={handleCloseModelModal}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    className="modal-button save-button"
+                    onClick={handleSaveModel}
+                    disabled={!selectedProvider || !selectedModel || !apiKey}
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
