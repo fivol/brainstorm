@@ -1,24 +1,20 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useRef, useEffect } from 'react'
+import { observer } from 'mobx-react-lite'
 import { TextBlock } from '../TextBlock'
+import { blocksStore } from '../../stores'
 
-export const Canvas = ({
-  blocks,
-  activeBlockId,
-  hoveredBlockId,
-  canvasRef,
-  getBlockDimensions,
-  onCanvasClick,
-  onBlockClick,
-  onTextChange,
-  onBlockBlur,
-  onBlockMouseEnter,
-  onBlockMouseLeave
-}) => {
+export const Canvas = observer(() => {
+  const canvasRef = useRef(null)
+
+  useEffect(() => {
+    blocksStore.setCanvasRef(canvasRef.current)
+  }, [])
+
   const renderedBlocks = useMemo(() => {
-    return blocks.map(block => {
-      const isExpanded = block.isActive || block.id === hoveredBlockId
+    return blocksStore.blocks.map(block => {
+      const isExpanded = block.isActive || block.id === blocksStore.hoveredBlockId
       const isFullyCollapsed = block.isCollapsed && !isExpanded && block.text.length > 50
-      const { width: displayWidth, height: displayHeight } = getBlockDimensions(block, isExpanded)
+      const { width: displayWidth, height: displayHeight } = blocksStore.getBlockDimensionsFn(block, isExpanded)
       
       let displayText = block.text
       if (isFullyCollapsed) {
@@ -37,24 +33,18 @@ export const Canvas = ({
           displayWidth={displayWidth}
           displayHeight={displayHeight}
           displayText={displayText}
-          onBlockClick={onBlockClick}
-          onTextChange={onTextChange}
-          onBlockBlur={onBlockBlur}
-          onMouseEnter={onBlockMouseEnter}
-          onMouseLeave={onBlockMouseLeave}
         />
       )
     })
-  }, [blocks, hoveredBlockId, activeBlockId, getBlockDimensions, onBlockClick, onTextChange, onBlockBlur, onBlockMouseEnter, onBlockMouseLeave])
+  }, [blocksStore.blocks, blocksStore.hoveredBlockId, blocksStore.activeBlockId])
 
   return (
     <div 
       ref={canvasRef}
       className="canvas" 
-      onClick={onCanvasClick}
+      onClick={(e) => blocksStore.handleCanvasClick(e)}
     >
       {renderedBlocks}
     </div>
   )
-}
-
+})

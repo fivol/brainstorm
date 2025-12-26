@@ -1,58 +1,71 @@
 import React from 'react'
-import { observer } from 'mobx-react-lite'
 import { Input, Select, LoadingSpinner } from '../../helpers'
 import { RECOMMENDED_MODELS } from '../../utils/modelUtils'
-import { modelConfigStore } from '../../stores'
+import type { ModelConfig, Model } from '../../utils/modelUtils'
 
-export const ModelModal = observer(() => {
-  const handleProviderChange = (e) => {
-    modelConfigStore.setSelectedProvider(e.target.value)
-  }
+interface ModelModalProps {
+  currentModel: ModelConfig | null
+  selectedProvider: string
+  selectedModel: string
+  apiKey: string
+  openaiModels: Model[]
+  loadingModels: boolean
+  onProviderChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
+  onModelChange: (e: React.ChangeEvent<HTMLSelectElement>) => void
+  onModelSelect: (modelId: string) => void
+  onApiKeyChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onClose: () => void
+  onSave: () => void
+  onRemove: () => void
+}
 
-  const handleModelChange = (e) => {
-    modelConfigStore.setSelectedModel(e.target.value)
-  }
-
-  const handleModelSelect = (modelId) => {
-    modelConfigStore.setSelectedModel(modelId)
-  }
-
-  const handleApiKeyChange = (e) => {
-    modelConfigStore.setApiKey(e.target.value)
-  }
-
+export const ModelModal: React.FC<ModelModalProps> = ({
+  currentModel,
+  selectedProvider,
+  selectedModel,
+  apiKey,
+  openaiModels,
+  loadingModels,
+  onProviderChange,
+  onModelChange,
+  onModelSelect,
+  onApiKeyChange,
+  onClose,
+  onSave,
+  onRemove
+}) => {
   return (
-    <div className="modal-overlay" onClick={() => modelConfigStore.handleCloseModal()}>
+    <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{modelConfigStore.currentModel ? 'Change Model' : 'Add Model'}</h2>
-          <button className="modal-close" onClick={() => modelConfigStore.handleCloseModal()}>×</button>
+          <h2>{currentModel ? 'Change Model' : 'Add Model'}</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
           <Select
             label="Provider"
             id="provider"
-            value={modelConfigStore.selectedProvider}
-            onChange={handleProviderChange}
+            value={selectedProvider}
+            onChange={onProviderChange}
           >
             <option value="">Select provider</option>
             <option value="openai">OpenAI</option>
           </Select>
 
-          {modelConfigStore.selectedProvider === 'openai' && (
+          {selectedProvider === 'openai' && (
             <>
               <Input
                 label="API Key"
                 id="api-key"
                 type="password"
-                value={modelConfigStore.apiKey}
-                onChange={handleApiKeyChange}
+                value={apiKey}
+                onChange={onApiKeyChange}
                 placeholder="sk-..."
               />
 
-              {modelConfigStore.loadingModels && <LoadingSpinner message="Loading models..." />}
+              {loadingModels && <LoadingSpinner message="Loading models..." />}
 
-              {modelConfigStore.apiKey && (
+              {apiKey && (
                 <div className="form-group">
                   <label>Recommended Models</label>
                   <div className="recommended-models">
@@ -60,8 +73,8 @@ export const ModelModal = observer(() => {
                       <button
                         key={model.id}
                         type="button"
-                        className={`recommended-model-button ${modelConfigStore.selectedModel === model.id ? 'selected' : ''}`}
-                        onClick={() => handleModelSelect(model.id)}
+                        className={`recommended-model-button ${selectedModel === model.id ? 'selected' : ''}`}
+                        onClick={() => onModelSelect(model.id)}
                       >
                         <div className="recommended-model-name">{model.name}</div>
                         <div className="recommended-model-label">{model.label}</div>
@@ -72,15 +85,15 @@ export const ModelModal = observer(() => {
                 </div>
               )}
 
-              {modelConfigStore.openaiModels.length > 0 && (
+              {openaiModels.length > 0 && (
                 <Select
                   label="All Available Models"
                   id="model"
-                  value={modelConfigStore.selectedModel}
-                  onChange={handleModelChange}
+                  value={selectedModel}
+                  onChange={onModelChange}
                 >
                   <option value="">Select model</option>
-                  {modelConfigStore.openaiModels.map(model => (
+                  {openaiModels.map(model => (
                     <option key={model.id} value={model.id}>
                       {model.name}
                     </option>
@@ -91,25 +104,25 @@ export const ModelModal = observer(() => {
           )}
 
           <div className="modal-actions">
-            {modelConfigStore.currentModel && (
+            {currentModel && (
               <button
                 className="modal-button remove-button"
-                onClick={() => modelConfigStore.handleRemove()}
+                onClick={onRemove}
               >
-                Remove {modelConfigStore.currentModel.provider === 'openai' ? 'OpenAI' : modelConfigStore.currentModel.provider}
+                Remove {currentModel.provider === 'openai' ? 'OpenAI' : currentModel.provider}
               </button>
             )}
             <div className="modal-actions-right">
               <button
                 className="modal-button cancel-button"
-                onClick={() => modelConfigStore.handleCloseModal()}
+                onClick={onClose}
               >
                 Cancel
               </button>
               <button
                 className="modal-button save-button"
-                onClick={() => modelConfigStore.handleSave()}
-                disabled={!modelConfigStore.selectedProvider || !modelConfigStore.selectedModel || !modelConfigStore.apiKey}
+                onClick={onSave}
+                disabled={!selectedProvider || !selectedModel || !apiKey}
               >
                 Save
               </button>
@@ -119,4 +132,5 @@ export const ModelModal = observer(() => {
       </div>
     </div>
   )
-})
+}
+

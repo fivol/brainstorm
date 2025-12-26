@@ -1,14 +1,32 @@
 import React from 'react'
-import { observer } from 'mobx-react-lite'
-import { blocksStore } from '../../stores'
+import type { Block } from '../../utils/blockUtils'
 
-export const TextBlock = observer(({
+interface TextBlockProps {
+  block: Block
+  isExpanded: boolean
+  isFullyCollapsed: boolean
+  displayWidth: number
+  displayHeight: number
+  displayText: string
+  onBlockClick: (e: React.MouseEvent, blockId: number) => void
+  onTextChange: (blockId: number, text: string) => void
+  onBlockBlur: (blockId: number) => void
+  onMouseEnter: (blockId: number) => void
+  onMouseLeave: (blockId: number) => void
+}
+
+export const TextBlock: React.FC<TextBlockProps> = ({
   block,
   isExpanded,
   isFullyCollapsed,
   displayWidth,
   displayHeight,
-  displayText
+  displayText,
+  onBlockClick,
+  onTextChange,
+  onBlockBlur,
+  onMouseEnter,
+  onMouseLeave
 }) => {
   return (
     <div
@@ -19,15 +37,15 @@ export const TextBlock = observer(({
         ...(isFullyCollapsed || (block.isCollapsed && !isExpanded) ? { width: `${displayWidth}px` } : {}),
         height: `${displayHeight}px`,
       }}
-      onClick={(e) => blocksStore.handleBlockClick(e, block.id)}
-      onMouseEnter={() => blocksStore.handleBlockMouseEnter(block.id)}
-      onMouseLeave={() => blocksStore.handleBlockMouseLeave(block.id)}
+      onClick={(e) => onBlockClick(e, block.id)}
+      onMouseEnter={() => onMouseEnter(block.id)}
+      onMouseLeave={() => onMouseLeave(block.id)}
     >
       {block.isActive ? (
         <textarea
           value={block.text}
-          onChange={(e) => blocksStore.handleTextChange(block.id, e.target.value)}
-          onBlur={() => blocksStore.handleBlockBlur(block.id)}
+          onChange={(e) => onTextChange(block.id, e.target.value)}
+          onBlur={() => onBlockBlur(block.id)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
@@ -55,4 +73,5 @@ export const TextBlock = observer(({
       )}
     </div>
   )
-})
+}
+
