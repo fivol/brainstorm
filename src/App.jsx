@@ -116,44 +116,10 @@ function App() {
         } else {
           const displayText = block.text.substring(0, 50)
           const textWidth = measureTextWidth(displayText)
-          // Padding: 12px left + 12px right = 24px
-          return { width: Math.max(100, textWidth + 24), height: 40 }
+          return { width: Math.max(100, textWidth + 40), height: 40 }
         }
       }
     }
-    
-    // For active/expanded blocks, calculate width based on text if it's short
-    if (isExpanded && block.text.trim()) {
-      // Check if text is likely single-line (no newlines and reasonable length)
-      const hasNewlines = block.text.includes('\n')
-      const textLength = block.text.length
-      
-      // If text is short and single-line, calculate fit-content width
-      if (!hasNewlines && textLength < 100) {
-        const textWidth = measureTextWidth(block.text)
-        // Padding: 12px left + 12px right = 24px, min width 100px
-        const calculatedWidth = Math.max(100, textWidth + 24)
-        // Don't exceed default width if text is very short
-        if (calculatedWidth < block.width) {
-          return { width: calculatedWidth, height: block.height }
-        }
-      }
-    }
-    
-    // For inactive blocks with short text, also calculate fit-content
-    if (!isExpanded && block.text.trim() && !block.isCollapsed) {
-      const hasNewlines = block.text.includes('\n')
-      const textLength = block.text.length
-      
-      if (!hasNewlines && textLength < 100) {
-        const textWidth = measureTextWidth(block.text)
-        const calculatedWidth = Math.max(100, textWidth + 24)
-        if (calculatedWidth < block.width) {
-          return { width: calculatedWidth, height: block.height }
-        }
-      }
-    }
-    
     return { width: block.width, height: block.height }
   }, [measureTextWidth])
 
@@ -280,26 +246,10 @@ function App() {
   }, [resolveCollisions, hoveredBlockId])
 
   const handleTextChange = useCallback((blockId, text) => {
-    setBlocks(prevBlocks => prevBlocks.map(block => {
-      if (block.id === blockId) {
-        // Auto-resize width for short text
-        const hasNewlines = text.includes('\n')
-        const textLength = text.length
-        
-        if (!hasNewlines && textLength < 100 && text.trim()) {
-          const textWidth = measureTextWidth(text)
-          const calculatedWidth = Math.max(100, textWidth + 24) // 12px padding on each side
-          // Only update if calculated width is smaller than current width
-          if (calculatedWidth < block.width) {
-            return { ...block, text, width: calculatedWidth }
-          }
-        }
-        
-        return { ...block, text }
-      }
-      return block
-    }))
-  }, [measureTextWidth])
+    setBlocks(prevBlocks => prevBlocks.map(block =>
+      block.id === blockId ? { ...block, text } : block
+    ))
+  }, [])
 
   const handleBlockBlur = useCallback((blockId) => {
     setActiveBlockId(null)
@@ -309,28 +259,15 @@ function App() {
       if (!block || !block.text.trim()) {
         return prevBlocks.filter(b => b.id !== blockId)
       }
-      // Otherwise, collapse it and recalculate width for short text
-      const updated = prevBlocks.map(b => {
-        if (b.id === blockId) {
-          const hasNewlines = b.text.includes('\n')
-          const textLength = b.text.length
-          
-          // Calculate fit-content width for short single-line text
-          if (!hasNewlines && textLength < 100 && b.text.trim()) {
-            const textWidth = measureTextWidth(b.text)
-            const calculatedWidth = Math.max(100, textWidth + 24) // 12px padding on each side
-            if (calculatedWidth < b.width) {
-              return { ...b, isActive: false, isCollapsed: true, width: calculatedWidth }
-            }
-          }
-          
-          return { ...b, isActive: false, isCollapsed: true }
-        }
-        return b
-      })
+      // Otherwise, collapse it
+      const updated = prevBlocks.map(b =>
+        b.id === blockId
+          ? { ...b, isActive: false, isCollapsed: true }
+          : b
+      )
       return resolveCollisions(updated, null, hoveredBlockId)
     })
-  }, [resolveCollisions, hoveredBlockId, measureTextWidth])
+  }, [resolveCollisions, hoveredBlockId])
 
   const handleBlockMouseEnter = useCallback((blockId) => {
     setHoveredBlockId(blockId)
@@ -424,8 +361,10 @@ function App() {
       let displayText = block.text
       if (isFullyCollapsed) {
         displayText = block.text.charAt(0).toUpperCase() || ''
-      } else if (block.isCollapsed && !isExpanded && block.text.trim()) {
-        displayText = block.text.substring(0, 50)
+      } else if (!isExpanded && block.text.trim()) {
+        // For inactive blocks, show only first line (up to 50 chars)
+        const firstLine = block.text.split('\n')[0]
+        displayText = firstLine.length > 50 ? firstLine.substring(0, 50) : firstLine
       }
 
       return (
@@ -435,7 +374,8 @@ function App() {
           style={{
             left: `${block.x}px`,
             top: `${block.y}px`,
-            width: `${displayWidth}px`,
+            // Only set width explicitly for collapsed blocks, let CSS handle active blocks
+            ...(isFullyCollapsed || (block.isCollapsed && !isExpanded) ? { width: `${displayWidth}px` } : {}),
             height: `${displayHeight}px`,
           }}
           onClick={(e) => handleBlockClick(e, block.id)}

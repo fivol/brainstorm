@@ -17,6 +17,8 @@
   transition: all 0.3s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
   min-width: 100px;
+  max-width: 200px;
+  width: fit-content;
   min-height: 40px;
   box-sizing: border-box;
 }
@@ -51,6 +53,7 @@
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   resize: none;
   width: 100%;
+  min-width: 0;
   height: 100%;
   padding: 0;
   margin: 0;
