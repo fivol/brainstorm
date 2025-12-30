@@ -59,11 +59,15 @@ class UIStore {
   
   /** Reference to graph store */
   graphStore = null;
+  
+  /** First visit flag (for creating first node after help closes) */
+  isFirstVisit = false;
 
   constructor() {
     makeAutoObservable(this, {
       graphStore: false,
-      setGraphStore: action
+      setGraphStore: action,
+      isFirstVisit: false
     });
   }
 
@@ -415,6 +419,13 @@ class UIStore {
 
   hideHelp() {
     this.helpVisible = false;
+    
+    // On first visit, create first node after help closes
+    if (this.isFirstVisit) {
+      this.isFirstVisit = false;
+      // Dispatch event for Canvas to create first node
+      window.dispatchEvent(new CustomEvent('brainstorm:first-visit-complete'));
+    }
   }
 
   // ============== Dev Mode ==============

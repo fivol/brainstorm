@@ -99,12 +99,40 @@ const Canvas = observer(function Canvas() {
     };
     window.addEventListener('brainstorm:center-node', handleCenterNode);
     
+    // Handle first visit complete - create first node
+    const handleFirstVisitComplete = () => {
+      // Create first node in center of view
+      const { x, y, scale } = uiStore.view;
+      const centerX = (renderer.width / 2 - x) / scale;
+      const centerY = (renderer.height / 2 - y) / scale;
+      
+      const node = graphStore.createNode({ x: centerX, y: centerY, text: '' });
+      uiStore.setActiveNode(node.id);
+      uiStore.setEditableNode(node.id);
+      
+      simulation.update();
+      simulation.reheat(0.2);
+      
+      renderer.centerOnNode(node.id, false);
+      renderer.render();
+      
+      // Focus the node text input
+      setTimeout(() => {
+        const nodeEl = svgRef.current?.querySelector(`[data-node-id="${node.id}"] .node-text-container`);
+        if (nodeEl) {
+          nodeEl.focus();
+        }
+      }, 100);
+    };
+    window.addEventListener('brainstorm:first-visit-complete', handleFirstVisitComplete);
+    
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('brainstorm:fit-view', handleFitView);
       window.removeEventListener('brainstorm:focus-node', handleFocusNode);
       window.removeEventListener('brainstorm:update-simulation', handleUpdateSimulation);
       window.removeEventListener('brainstorm:center-node', handleCenterNode);
+      window.removeEventListener('brainstorm:first-visit-complete', handleFirstVisitComplete);
       simulation.dispose();
       renderer.dispose();
     };

@@ -26,7 +26,8 @@ export class PersistenceService {
     const isFirstVisit = !localStorage.getItem(FIRST_VISIT_KEY);
     if (isFirstVisit) {
       localStorage.setItem(FIRST_VISIT_KEY, 'true');
-      // Show help panel on first visit
+      // Set first visit flag and show help panel
+      this.uiStore.isFirstVisit = true;
       this.uiStore.showHelp();
     }
     
