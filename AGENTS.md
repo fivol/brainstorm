@@ -15,4 +15,7 @@
 - Add comments for complex logic.
 - Ensure code passes linting checks before committing.
 
+## When using Worktrees feature
+- add "model.txt" file with ML model specified (thinking or not also)
+- Title web page with model name it created (like in model.txt)
 
