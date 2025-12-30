@@ -13,6 +13,9 @@ class GraphStore {
   /** @type {Map<string, import('../types').GraphEdge>} */
   edges = new Map();
   
+  /** Graph title */
+  title = '';
+  
   /** Reference to undo store (set after initialization) */
   undoStore = null;
   
@@ -20,10 +23,11 @@ class GraphStore {
   uiStore = null;
   
   // Default size for new nodes (consistent initial size)
-  static DEFAULT_NODE_WIDTH = 120;
+  // Width should accommodate typical input, single-line height
+  static DEFAULT_NODE_WIDTH = 160;
   static DEFAULT_NODE_HEIGHT = 44;
-  // Max width for nodes (~6 words)
-  static MAX_NODE_WIDTH = 200;
+  // Max width for nodes before text wraps
+  static MAX_NODE_WIDTH = 280;
 
   constructor() {
     makeAutoObservable(this, {
@@ -40,6 +44,18 @@ class GraphStore {
 
   setUIStore(store) {
     this.uiStore = store;
+  }
+
+  // ============== Title ==============
+
+  /**
+   * Set graph title.
+   * @param {string} title
+   */
+  setTitle(title) {
+    this.title = title;
+    // Update document title
+    document.title = title ? `BrainStorm: ${title}` : 'BrainStorm';
   }
 
   // ============== Node Operations ==============
@@ -391,6 +407,8 @@ class GraphStore {
   clear() {
     this.nodes.clear();
     this.edges.clear();
+    this.title = '';
+    document.title = 'BrainStorm';
     if (this.undoStore) {
       this.undoStore.clear();
     }
@@ -402,6 +420,11 @@ class GraphStore {
    */
   loadFromData(data) {
     this.clear();
+    
+    // Load title
+    if (data.title !== undefined) {
+      this.setTitle(data.title);
+    }
     
     if (data.nodes) {
       for (const nodeData of data.nodes) {
@@ -451,7 +474,11 @@ class GraphStore {
       label: edge.label || undefined
     }));
     
-    return { nodes, edges };
+    return { 
+      title: this.title || undefined,
+      nodes, 
+      edges 
+    };
   }
 }
 

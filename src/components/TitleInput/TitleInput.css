@@ -1,0 +1,35 @@
+.title-input-container {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 100;
+}
+
+.title-input {
+  background: transparent;
+  border: none;
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-color);
+  padding: 8px 12px;
+  border-radius: 8px;
+  min-width: 120px;
+  max-width: 300px;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.title-input::placeholder {
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.title-input:hover {
+  background: var(--hover-bg);
+}
+
+.title-input:focus {
+  background: var(--controls-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  outline: none;
+}
+

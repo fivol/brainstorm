@@ -27,6 +27,7 @@ export class PersistenceService {
     // Set up auto-save on changes
     this.disposeReaction = reaction(
       () => ({
+        title: this.graphStore.title,
         nodes: Array.from(this.graphStore.nodes.values()).map(n => ({
           id: n.id,
           text: n.text,
