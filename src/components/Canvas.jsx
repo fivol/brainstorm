@@ -1466,38 +1466,52 @@ const Canvas = observer(function Canvas() {
             top: aiInputPosition.y,
           }}
         >
-          <input
-            ref={aiInputRef}
-            type="text"
-            className="ai-generate-input"
-            placeholder="Describe what to generate..."
-            value={aiInputValue}
-            onChange={(e) => setAIInputValue(e.target.value)}
-            onKeyDown={handleAIInputKeyDown}
-            onBlur={() => {
-              // Delay to allow click on submit
-              setTimeout(() => {
-                if (!aiStore.generateLoading) {
-                  setShowAIInput(false);
-                }
-              }, 200);
-            }}
-          />
-          {aiStore.generateLoading ? (
-            <div className="ai-generate-loading">
-              <span className="ai-generate-spinner" />
-            </div>
-          ) : (
-            <button 
-              className="ai-generate-submit"
-              onClick={handleAIInputSubmit}
-              disabled={!aiInputValue.trim()}
-            >
-              <svg viewBox="0 0 24 24" width="16" height="16">
-                <path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-              </svg>
-            </button>
-          )}
+          <div className="ai-generate-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+            </svg>
+            <span>AI Generate</span>
+          </div>
+          <div className="ai-generate-body">
+            <input
+              ref={aiInputRef}
+              type="text"
+              className="ai-generate-input"
+              placeholder="What would you like to create?"
+              value={aiInputValue}
+              onChange={(e) => setAIInputValue(e.target.value)}
+              onKeyDown={handleAIInputKeyDown}
+              onBlur={() => {
+                // Delay to allow click on submit
+                setTimeout(() => {
+                  if (!aiStore.generateLoading) {
+                    setShowAIInput(false);
+                  }
+                }, 200);
+              }}
+            />
+            {aiStore.generateLoading ? (
+              <div className="ai-generate-loading">
+                <span className="ai-generate-spinner" />
+              </div>
+            ) : (
+              <button 
+                className="ai-generate-submit"
+                onClick={handleAIInputSubmit}
+                disabled={!aiInputValue.trim()}
+                title="Generate"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            )}
+          </div>
+          <div className="ai-generate-hint">
+            <span>Describe nodes, topics, or ideas to add</span>
+            <span><kbd>Enter</kbd> to send · <kbd>Esc</kbd> to close</span>
+          </div>
         </div>
       )}
       

@@ -219,46 +219,93 @@
   transform: scale(0.95);
 }
 
-/* AI Generate Input */
+/* AI Generate Input - Modern floating prompt */
 .ai-generate-input-container {
   position: fixed;
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
   background: var(--panel-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  border: 1px solid transparent;
+  border-radius: var(--radius-xl);
+  box-shadow: 
+    0 0 0 1px rgba(102, 126, 234, 0.2),
+    0 8px 32px rgba(0, 0, 0, 0.25),
+    0 2px 8px rgba(102, 126, 234, 0.15);
   z-index: 200;
-  animation: ai-input-appear var(--transition-fast);
+  animation: ai-input-appear 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+  min-width: 340px;
+}
+
+.ai-generate-input-container::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--radius-xl);
+  background: var(--ai-gradient);
+  z-index: -1;
+  opacity: 0.5;
 }
 
 @keyframes ai-input-appear {
   from {
     opacity: 0;
-    transform: translateY(-5px);
+    transform: translateY(-8px) scale(0.95);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
+.ai-generate-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.08) 100%);
+  border-bottom: 1px solid rgba(102, 126, 234, 0.15);
+}
+
+.ai-generate-header svg {
+  width: 16px;
+  height: 16px;
+  color: #667eea;
+}
+
+.ai-generate-header span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.ai-generate-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+}
+
 .ai-generate-input {
-  width: 260px;
-  padding: 8px 12px;
-  background: var(--bg-color);
-  border: 1px solid var(--border-color);
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--bg-muted);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
   color: var(--text-color);
   font-size: 14px;
   outline: none;
-  transition: border-color var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 
 .ai-generate-input:focus {
-  border-color: var(--info-color);
+  background: var(--bg-color);
+  border-color: rgba(102, 126, 234, 0.4);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
 .ai-generate-input::placeholder {
@@ -269,40 +316,69 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
   padding: 0;
-  background: var(--info-color);
+  background: var(--ai-gradient);
   border: none;
   border-radius: var(--radius-md);
   color: white;
   cursor: pointer;
-  transition: opacity var(--transition-fast), background var(--transition-fast);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .ai-generate-submit:hover:not(:disabled) {
-  background: #1565c0;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.ai-generate-submit:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .ai-generate-submit:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+  background: var(--text-muted);
+}
+
+.ai-generate-submit svg {
+  width: 18px;
+  height: 18px;
 }
 
 .ai-generate-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
 }
 
-/* Uses shared spin animation from App.css */
 .ai-generate-spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--info-color);
-  border-right-color: transparent;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(102, 126, 234, 0.3);
+  border-top-color: #667eea;
   border-radius: 50%;
-  animation: spin 0.75s linear infinite;
+  animation: spin 0.8s linear infinite;
+}
+
+.ai-generate-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: var(--bg-muted);
+  border-top: 1px solid var(--border-light);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ai-generate-hint kbd {
+  font-size: 10px;
+  padding: 2px 5px;
+  min-width: auto;
 }
