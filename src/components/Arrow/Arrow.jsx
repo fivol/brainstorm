@@ -1,6 +1,6 @@
 import React from 'react'
 import { observer } from 'mobx-react-lite'
-import { getArrowPoints } from '../../utils/blockUtils'
+import { generateBezierPath, findConnectionPoints } from '../../utils/layoutUtils'
 
 export const Arrow = observer(({ 
   fromBlock, 
@@ -12,7 +12,7 @@ export const Arrow = observer(({
   arrowId = 'arrow',
   isBidirectional = false
 }) => {
-  let fromX, fromY, toX, toY, angle
+  let fromX, fromY, toX, toY, pathD
 
   if (isTemporary && tempEnd) {
     // Temporary arrow while dragging
@@ -21,7 +21,7 @@ export const Arrow = observer(({
     
     const dx = tempEnd.x - fromCenterX
     const dy = tempEnd.y - fromCenterY
-    angle = Math.atan2(dy, dx)
+    const angle = Math.atan2(dy, dx)
 
     const fromHalfWidth = fromDimensions.width / 2
     const fromHalfHeight = fromDimensions.height / 2
@@ -39,23 +39,31 @@ export const Arrow = observer(({
 
     toX = tempEnd.x
     toY = tempEnd.y
-  } else {
+    
+    // Generate bezier path for temporary arrow
+    pathD = generateBezierPath(fromX, fromY, toX, toY)
+  } else if (toBlock) {
     // Permanent arrow between two blocks
-    const points = getArrowPoints(fromBlock, toBlock, fromDimensions, toDimensions)
+    const points = findConnectionPoints(fromBlock, toBlock, fromDimensions, toDimensions)
     fromX = points.fromX
     fromY = points.fromY
     toX = points.toX
     toY = points.toY
-    angle = points.angle
+    
+    // Generate bezier path
+    pathD = generateBezierPath(fromX, fromY, toX, toY)
+  } else {
+    return null
   }
 
-  // For bidirectional connections, use center-to-center line
+  // For bidirectional connections, use simpler straight line at center
   if (isBidirectional && !isTemporary) {
     fromX = fromBlock.x + fromDimensions.width / 2
     fromY = fromBlock.y + fromDimensions.height / 2
     toX = toBlock.x + toDimensions.width / 2
     toY = toBlock.y + toDimensions.height / 2
-    angle = Math.atan2(toY - fromY, toX - fromX)
+    // Straight line for bidirectional
+    pathD = `M ${fromX} ${fromY} L ${toX} ${toY}`
   }
 
   return (
@@ -67,48 +75,74 @@ export const Arrow = observer(({
         width: '100%',
         height: '100%',
         pointerEvents: 'none',
-        zIndex: 100
+        zIndex: 100,
+        overflow: 'visible'
       }}
     >
       <defs>
         {!isBidirectional && (
           <marker
             id={`arrowhead-${arrowId}`}
-            markerWidth="8"
-            markerHeight="8"
-            refX="7"
-            refY="2.5"
+            markerWidth="10"
+            markerHeight="10"
+            refX="9"
+            refY="3"
             orient="auto"
             markerUnits="userSpaceOnUse"
           >
             <polygon
-              points="0 0, 8 2.5, 0 5"
+              points="0 0, 10 3, 0 6"
               fill="#646cff"
-              opacity={isTemporary ? 0.6 : 0.8}
+              opacity={isTemporary ? 0.6 : 0.9}
             />
           </marker>
         )}
-        <linearGradient id={`arrowGradient-${arrowId}`} x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stopColor="#646cff" stopOpacity="0.6" />
+        <linearGradient 
+          id={`arrowGradient-${arrowId}`} 
+          gradientUnits="userSpaceOnUse"
+          x1={fromX} 
+          y1={fromY} 
+          x2={toX} 
+          y2={toY}
+        >
+          <stop offset="0%" stopColor="#646cff" stopOpacity="0.5" />
+          <stop offset="50%" stopColor="#8b5cf6" stopOpacity="0.8" />
           <stop offset="100%" stopColor="#646cff" stopOpacity="0.9" />
         </linearGradient>
+        {/* Glow filter for arrows */}
+        <filter id={`glow-${arrowId}`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2" result="coloredBlur" />
+          <feMerge>
+            <feMergeNode in="coloredBlur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
       </defs>
-      <line
-        x1={fromX}
-        y1={fromY}
-        x2={toX}
-        y2={toY}
+      
+      {/* Shadow/glow layer */}
+      <path
+        d={pathD}
+        fill="none"
+        stroke="rgba(100, 108, 255, 0.3)"
+        strokeWidth={isTemporary ? 4 : 6}
+        strokeLinecap="round"
+        style={{
+          filter: `url(#glow-${arrowId})`
+        }}
+      />
+      
+      {/* Main arrow path */}
+      <path
+        d={pathD}
+        fill="none"
         stroke={isTemporary ? '#646cff' : `url(#arrowGradient-${arrowId})`}
         strokeWidth={isTemporary ? 2 : 2.5}
-        strokeOpacity={isTemporary ? 0.6 : 0.8}
+        strokeLinecap="round"
         markerEnd={!isBidirectional ? `url(#arrowhead-${arrowId})` : undefined}
         style={{
-          filter: isTemporary 
-            ? 'drop-shadow(0 0 4px rgba(100, 108, 255, 0.4))'
-            : 'drop-shadow(0 0 6px rgba(100, 108, 255, 0.5))'
+          transition: isTemporary ? 'none' : 'd 0.3s ease-out'
         }}
       />
     </svg>
   )
 })
-

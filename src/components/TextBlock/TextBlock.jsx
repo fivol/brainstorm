@@ -23,7 +23,7 @@ export const TextBlock = observer(({
 
   return (
     <div
-      className={`text-block ${block.isActive ? 'active' : ''} ${isFullyCollapsed ? 'collapsed-circle' : ''}`}
+      className={`text-block ${block.isActive ? 'active' : ''} ${isFullyCollapsed ? 'collapsed-circle' : ''} ${blocksStore.isAnimating ? 'animating' : ''}`}
       style={{
         left: `${block.x}px`,
         top: `${block.y}px`,

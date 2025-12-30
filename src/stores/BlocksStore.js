@@ -1,5 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx'
 import { getBlockDimensions, resolveCollisions, measureTextWidth } from '../utils/blockUtils'
+import { calculateHierarchicalLayout, getLayoutBounds } from '../utils/layoutUtils'
 
 class BlocksStore {
   blocks = []
@@ -20,9 +21,24 @@ class BlocksStore {
   panStartY = 0 // Starting Y position when panning starts
   panStartOffsetX = 0 // Canvas offset X when panning starts
   panStartOffsetY = 0 // Canvas offset Y when panning starts
+  
+  // Layout settings
+  autoLayoutEnabled = true // Whether to auto-arrange blocks on connection changes
+  isAnimating = false // Whether blocks are currently animating to new positions
 
   constructor() {
     makeAutoObservable(this)
+    // Listen for window resize
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', this.handleWindowResize.bind(this))
+    }
+  }
+
+  // Handle window resize - recalculate layout
+  handleWindowResize() {
+    if (this.autoLayoutEnabled && this.connections.length > 0) {
+      this.applyHierarchicalLayout()
+    }
   }
 
   setCanvasRef(ref) {
@@ -253,6 +269,14 @@ class BlocksStore {
               from: this.connectingFrom,
               to: targetBlock.id
             })
+            
+            // Apply hierarchical layout after new connection
+            if (this.autoLayoutEnabled) {
+              // Delay slightly to allow the connection to be rendered first
+              setTimeout(() => {
+                this.applyHierarchicalLayout()
+              }, 50)
+            }
           }
           // Set flag to prevent canvas click from creating new block
           this.justFinishedConnecting = true
@@ -274,6 +298,88 @@ class BlocksStore {
       this.connections = this.connections.filter(
         conn => !(conn.from === fromId && conn.to === toId)
       )
+      // Recalculate layout after connection removal
+      if (this.autoLayoutEnabled) {
+        this.applyHierarchicalLayout()
+      }
+    })
+  }
+
+  // Apply hierarchical layout to all blocks
+  applyHierarchicalLayout() {
+    if (this.blocks.length === 0) return
+    
+    const canvasWidth = window.innerWidth
+    const canvasHeight = window.innerHeight
+    
+    const positionMap = calculateHierarchicalLayout(
+      this.blocks,
+      this.connections,
+      canvasWidth,
+      canvasHeight
+    )
+    
+    runInAction(() => {
+      this.isAnimating = true
+      this.blocks = this.blocks.map(block => {
+        const newPos = positionMap.get(block.id)
+        if (newPos) {
+          return {
+            ...block,
+            x: newPos.x,
+            y: newPos.y
+          }
+        }
+        return block
+      })
+      
+      // Clear animation flag after transition completes
+      setTimeout(() => {
+        runInAction(() => {
+          this.isAnimating = false
+        })
+      }, 500)
+    })
+  }
+
+  // Toggle auto layout
+  toggleAutoLayout() {
+    runInAction(() => {
+      this.autoLayoutEnabled = !this.autoLayoutEnabled
+      if (this.autoLayoutEnabled && this.connections.length > 0) {
+        this.applyHierarchicalLayout()
+      }
+    })
+  }
+
+  // Manually trigger layout
+  reorganizeLayout() {
+    this.applyHierarchicalLayout()
+  }
+
+  // Fit all blocks in viewport
+  fitToViewport() {
+    if (this.blocks.length === 0) return
+    
+    const bounds = getLayoutBounds(
+      new Map(this.blocks.map(b => [b.id, { x: b.x, y: b.y }])),
+      this.blocks
+    )
+    
+    if (bounds.width === 0 || bounds.height === 0) return
+    
+    const padding = 100
+    const viewportWidth = window.innerWidth - padding * 2
+    const viewportHeight = window.innerHeight - padding * 2
+    
+    const scaleX = viewportWidth / bounds.width
+    const scaleY = viewportHeight / bounds.height
+    const newScale = Math.min(scaleX, scaleY, 2) // Cap at 2x zoom
+    
+    runInAction(() => {
+      this.scale = Math.max(0.1, newScale)
+      this.panX = padding - bounds.minX * this.scale
+      this.panY = padding - bounds.minY * this.scale
     })
   }
 

@@ -14,6 +14,41 @@ export const FloatingButtons = observer(() => {
       >
         {modelConfigStore.currentModel ? 'Change Model' : 'Add Model'}
       </button>
+      
+      {/* Layout Controls */}
+      <button 
+        className={`floating-button layout-button ${blocksStore.autoLayoutEnabled ? 'active' : ''}`}
+        onClick={(e) => {
+          e.stopPropagation()
+          blocksStore.toggleAutoLayout()
+        }}
+        title={blocksStore.autoLayoutEnabled ? 'Auto-layout ON' : 'Auto-layout OFF'}
+      >
+        {blocksStore.autoLayoutEnabled ? '⚡ Auto Layout' : '📐 Manual'}
+      </button>
+      
+      <button 
+        className="floating-button layout-button"
+        onClick={(e) => {
+          e.stopPropagation()
+          blocksStore.reorganizeLayout()
+        }}
+        title="Reorganize blocks into hierarchical layout"
+      >
+        🔄 Reorganize
+      </button>
+      
+      <button 
+        className="floating-button layout-button"
+        onClick={(e) => {
+          e.stopPropagation()
+          blocksStore.fitToViewport()
+        }}
+        title="Fit all blocks in viewport"
+      >
+        🔍 Fit View
+      </button>
+      
       <button 
         className="floating-button remove-all-button"
         onClick={(e) => {
