@@ -213,13 +213,46 @@ kbd {
   color: var(--text-muted);
 }
 
-/* AI Description in header */
-.help-description-ai {
-  margin-top: 12px;
+/* AI Feature highlight block */
+.help-ai-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.06) 0%, rgba(118, 75, 162, 0.06) 100%);
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: var(--radius-md);
+}
+
+.help-ai-feature-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--ai-gradient);
+  border-radius: var(--radius-md);
+  color: white;
+}
+
+.help-ai-feature-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.help-ai-feature-content strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.help-ai-feature-content span {
   font-size: 13px;
-  color: var(--text-muted);
-  padding-left: 12px;
-  border-left: 2px solid var(--info-color);
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .help-ai-status {

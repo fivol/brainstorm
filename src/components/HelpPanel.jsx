@@ -132,10 +132,17 @@ const HelpPanel = observer(function HelpPanel() {
               <strong>BrainStorm</strong> — a visual tool for brainstorming and organizing ideas. 
               Create nodes, connect them with edges, and build mind maps effortlessly.
             </p>
-            <p className="help-description-ai">
-              <strong>AI-Powered:</strong> Get intelligent suggestions as you work. 
-              The AI analyzes your mind map context and proposes relevant ideas to expand your thinking.
-            </p>
+            <div className="help-ai-feature">
+              <div className="help-ai-feature-icon">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+                </svg>
+              </div>
+              <div className="help-ai-feature-content">
+                <strong>AI-Powered Suggestions</strong>
+                <span>Get intelligent ideas as you work. The AI analyzes your mind map and proposes relevant concepts to expand your thinking.</span>
+              </div>
+            </div>
           </div>
           
           <div className="help-examples">

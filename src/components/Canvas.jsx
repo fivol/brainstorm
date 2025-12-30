@@ -1459,14 +1459,27 @@ const Canvas = observer(function Canvas() {
             <span>AI Generate</span>
           </div>
           <div className="ai-generate-body">
-            <input
+            <textarea
               ref={aiInputRef}
-              type="text"
               className="ai-generate-input"
               placeholder="What would you like to create?"
               value={aiInputValue}
-              onChange={(e) => setAIInputValue(e.target.value)}
-              onKeyDown={handleAIInputKeyDown}
+              rows={1}
+              onChange={(e) => {
+                setAIInputValue(e.target.value);
+                // Auto-expand height
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px';
+              }}
+              onKeyDown={(e) => {
+                // Submit on Enter (without shift), allow Shift+Enter for newline
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleAIInputSubmit();
+                } else if (e.key === 'Escape') {
+                  setShowAIInput(false);
+                }
+              }}
               onBlur={() => {
                 // Delay to allow click on submit
                 setTimeout(() => {
@@ -1496,7 +1509,7 @@ const Canvas = observer(function Canvas() {
           </div>
           <div className="ai-generate-hint">
             <span>Describe nodes, topics, or ideas to add</span>
-            <span><kbd>Enter</kbd> to send · <kbd>Esc</kbd> to close</span>
+            <span><kbd>Enter</kbd> send · <kbd>⇧Enter</kbd> newline · <kbd>Esc</kbd> close</span>
           </div>
         </div>
       )}
