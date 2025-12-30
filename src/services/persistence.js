@@ -2,6 +2,7 @@ import { reaction, toJS } from 'mobx';
 
 const STORAGE_KEY = 'brainstorm-graph';
 const VIEW_KEY = 'brainstorm-view';
+const FIRST_VISIT_KEY = 'brainstorm-visited';
 
 /**
  * Persistence service for auto-saving and restoring graph state.
@@ -21,10 +22,18 @@ export class PersistenceService {
    * Start auto-persistence.
    */
   start() {
+    // Check for first visit
+    const isFirstVisit = !localStorage.getItem(FIRST_VISIT_KEY);
+    if (isFirstVisit) {
+      localStorage.setItem(FIRST_VISIT_KEY, 'true');
+      // Show help panel on first visit
+      this.uiStore.showHelp();
+    }
+    
     // Load saved state
     this.load();
     
-    // Set up auto-save on changes
+    // Set up auto-save on changes (immediate reaction, small debounce)
     this.disposeReaction = reaction(
       () => ({
         title: this.graphStore.title,
@@ -44,14 +53,14 @@ export class PersistenceService {
         }))
       }),
       () => this.debouncedSave(),
-      { delay: 500 }
+      { delay: 100 }
     );
     
     // Also save view state changes
     reaction(
       () => ({ ...this.uiStore.view }),
       () => this.saveViewState(),
-      { delay: 1000 }
+      { delay: 300 }
     );
   }
 
@@ -75,7 +84,7 @@ export class PersistenceService {
     if (this.saveTimeout) {
       clearTimeout(this.saveTimeout);
     }
-    this.saveTimeout = setTimeout(() => this.save(), 300);
+    this.saveTimeout = setTimeout(() => this.save(), 100);
   }
 
   /**
