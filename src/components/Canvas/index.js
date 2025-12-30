@@ -1,3 +1,0 @@
-export { Canvas } from './Canvas'
-
-
