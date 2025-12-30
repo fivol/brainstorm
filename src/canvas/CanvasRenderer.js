@@ -80,12 +80,26 @@ export class CanvasRenderer {
   setupZoom() {
     const zoom = d3.zoom()
       .scaleExtent([0.1, 4])
+      // Enable both pan and zoom via wheel/trackpad
+      // wheelDelta controls zoom sensitivity
+      .wheelDelta(event => {
+        // Trackpad pinch-to-zoom uses ctrlKey
+        // Regular scroll wheel doesn't
+        if (event.ctrlKey) {
+          // Pinch zoom - use delta for zoom
+          return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
+        }
+        // Two-finger scroll - handled as pan, return 0 to not zoom
+        return 0;
+      })
       .filter(event => {
-        // Allow wheel zoom and touch gestures
+        // Allow all wheel events (for both pan and zoom)
         if (event.type === 'wheel') return true;
-        if (event.type === 'touchstart' || event.type === 'touchmove') return true;
-        // Allow middle mouse button pan
+        // Allow touch gestures
+        if (event.type === 'touchstart' || event.type === 'touchmove' || event.type === 'touchend') return true;
+        // Allow middle mouse button
         if (event.type === 'mousedown' && event.button === 1) return true;
+        // Block other mouse events on canvas (left click creates nodes)
         return false;
       })
       .on('zoom', (event) => {
@@ -96,6 +110,27 @@ export class CanvasRenderer {
           scale: event.transform.k
         });
       });
+    
+    // Handle two-finger pan via wheel events (without ctrl)
+    this.svg.on('wheel.pan', (event) => {
+      if (event.ctrlKey) return; // Let zoom handler deal with pinch
+      
+      event.preventDefault();
+      
+      // Get current transform
+      const currentTransform = d3.zoomTransform(this.svg.node());
+      
+      // Calculate new position based on scroll delta
+      const newX = currentTransform.x - event.deltaX;
+      const newY = currentTransform.y - event.deltaY;
+      
+      // Apply new transform
+      const newTransform = d3.zoomIdentity
+        .translate(newX, newY)
+        .scale(currentTransform.k);
+      
+      this.svg.call(zoom.transform, newTransform);
+    });
     
     this.svg.call(zoom);
     this.zoom = zoom;

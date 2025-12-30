@@ -2,46 +2,70 @@ import * as d3 from 'd3';
 
 /**
  * Force simulation manager for graph layout.
- * Handles node positioning, collision detection, and edge-aware forces.
+ * 
+ * Uses the Brainstorm algorithm with competing physical forces:
+ * - Many-Body (global repulsion)
+ * - Link (elastic tension between connected nodes)
+ * - Collision (physical volume prevents overlap)
+ * - Centering forces (keeps graph in view)
  */
 export class ForceSimulation {
   simulation = null;
   graphStore = null;
+  uiStore = null;
   onTick = null;
   
-  // Force parameters
-  linkDistance = 150;
-  linkStrength = 0.3;
-  chargeStrength = -400;
-  collisionRadius = 50;
-  centerStrength = 0.02;
+  // Force parameters matching the algorithm spec
+  linkDistance = 250;          // Target distance between connected nodes
+  chargeStrength = -1000;      // Strong repulsion for spacing
+  collisionPadding = 20;       // Extra padding around nodes
   
-  constructor(graphStore, options = {}) {
+  // Track focused node for selective strengthening
+  focusedNodeId = null;
+  
+  constructor(graphStore, uiStore = null, options = {}) {
     this.graphStore = graphStore;
+    this.uiStore = uiStore;
     Object.assign(this, options);
     this.init();
   }
 
   init() {
     this.simulation = d3.forceSimulation()
+      // A. Many-Body Force (Global Repulsion)
+      // Every node repels every other node
+      .force('charge', d3.forceManyBody()
+        .strength(this.chargeStrength)
+        .distanceMax(500)  // Optimization: cap at 500px for performance
+      )
+      
+      // B. Link Force (Elastic Tension)
+      // Acts like springs between connected nodes
       .force('link', d3.forceLink()
         .id(d => d.id)
         .distance(this.linkDistance)
-        .strength(this.linkStrength)
+        .strength(d => this.getLinkStrength(d))
       )
-      .force('charge', d3.forceManyBody()
-        .strength(this.chargeStrength)
-        .distanceMax(500)
-      )
+      
+      // C. Collision Force (Physical Volume)
+      // Prevents node overlap with push behavior
       .force('collision', d3.forceCollide()
         .radius(d => this.getCollisionRadius(d))
-        .strength(0.8)
+        .strength(1)  // Full strength for solid collision
+        .iterations(2)  // Multiple iterations for better resolution
       )
-      .force('center', d3.forceCenter(0, 0)
-        .strength(this.centerStrength)
-      )
-      .alphaDecay(0.02)
-      .velocityDecay(0.3);
+      
+      // D. Centering Forces
+      // Keep center of mass at origin
+      .force('center', d3.forceCenter(0, 0))
+      
+      // Gentle gravity to prevent infinite drift
+      .force('x', d3.forceX(0).strength(0.02))
+      .force('y', d3.forceY(0).strength(0.02))
+      
+      // Simulation parameters for smooth animation
+      .alphaDecay(0.02)      // Slower decay for smoother settling
+      .velocityDecay(0.4);   // Medium friction for natural movement
     
     this.simulation.on('tick', () => {
       this.syncToStore();
@@ -53,26 +77,58 @@ export class ForceSimulation {
   }
 
   /**
-   * Get collision radius for a node based on its size.
+   * Get collision radius for a node based on its geometric bounds.
+   * Formula: sqrt((width/2)^2 + (height/2)^2) + padding
    * @param {Object} d - Node data
    * @returns {number}
    */
   getCollisionRadius(d) {
-    const w = d.w || 100;
-    const h = d.h || 50;
-    return Math.sqrt(w * w + h * h) / 2 + 20;
+    const halfW = (d.w || 100) / 2;
+    const halfH = (d.h || 50) / 2;
+    return Math.sqrt(halfW * halfW + halfH * halfH) + this.collisionPadding;
+  }
+
+  /**
+   * Get link strength based on focus context.
+   * Connected to focused node: 1.0 (rigid)
+   * Not connected to focused: 0.1 (loose)
+   * @param {Object} d - Link data with source/target
+   * @returns {number}
+   */
+  getLinkStrength(d) {
+    if (!this.focusedNodeId) {
+      return 0.3; // Default medium strength
+    }
+    
+    const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+    const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+    
+    // Connected to focused node gets rigid strength
+    if (sourceId === this.focusedNodeId || targetId === this.focusedNodeId) {
+      return 1.0;
+    }
+    
+    // Other links stay loose
+    return 0.1;
   }
 
   /**
    * Update simulation with current graph data.
    */
   update() {
-    const nodes = this.graphStore.getNodes().map(n => ({
-      ...n,
-      // D3 will add x, y, vx, vy - preserve if exists
-      vx: n.vx || 0,
-      vy: n.vy || 0
-    }));
+    const nodes = this.graphStore.getNodes().map(n => {
+      // Find existing simulation node to preserve velocity
+      const existing = this.simulation.nodes().find(sn => sn.id === n.id);
+      return {
+        ...n,
+        // Preserve velocity for smooth continuation
+        vx: existing?.vx || 0,
+        vy: existing?.vy || 0,
+        // Preserve fixed position if set
+        fx: existing?.fx,
+        fy: existing?.fy
+      };
+    });
     
     const edges = this.graphStore.getEdges().map(e => ({
       source: e.sourceId,
@@ -82,8 +138,11 @@ export class ForceSimulation {
     this.simulation.nodes(nodes);
     this.simulation.force('link').links(edges);
     
-    // Update collision radii
+    // Update collision radii based on current node sizes
     this.simulation.force('collision').radius(d => this.getCollisionRadius(d));
+    
+    // Update link strengths based on focus
+    this.simulation.force('link').strength(d => this.getLinkStrength(d));
   }
 
   /**
@@ -118,7 +177,7 @@ export class ForceSimulation {
 
   /**
    * Trigger a gentle layout adaptation.
-   * @param {number} [alpha=0.3]
+   * @param {number} [alpha=0.3] - Heat level (0-1)
    */
   reheat(alpha = 0.3) {
     this.update();
@@ -127,6 +186,7 @@ export class ForceSimulation {
 
   /**
    * Fix a node position (during drag).
+   * Setting fx/fy overrides physics calculations.
    * @param {string} nodeId
    * @param {number} x
    * @param {number} y
@@ -142,6 +202,7 @@ export class ForceSimulation {
 
   /**
    * Release a fixed node.
+   * Allows physics to take over again.
    * @param {string} nodeId
    */
   releaseNode(nodeId) {
@@ -151,6 +212,25 @@ export class ForceSimulation {
       node.fx = null;
       node.fy = null;
     }
+  }
+
+  /**
+   * Start drag interaction.
+   * Heats up simulation for responsive push behavior.
+   * @param {string} nodeId
+   */
+  startDrag(nodeId) {
+    // Heat up simulation for responsive collision
+    this.simulation.alphaTarget(0.3).restart();
+  }
+
+  /**
+   * End drag interaction.
+   * Allows simulation to cool down naturally.
+   */
+  endDrag() {
+    // Let simulation cool down naturally
+    this.simulation.alphaTarget(0);
   }
 
   /**
@@ -174,46 +254,45 @@ export class ForceSimulation {
    * @param {number} y
    */
   setCenter(x, y) {
-    this.simulation.force('center', d3.forceCenter(x, y).strength(this.centerStrength));
+    this.simulation.force('center', d3.forceCenter(x, y));
+    this.simulation.force('x', d3.forceX(x).strength(0.02));
+    this.simulation.force('y', d3.forceY(y).strength(0.02));
   }
 
   /**
-   * Focus on a node - pull connected nodes closer.
+   * Focus on a node - connected nodes snap closer via selective strengthening.
    * @param {string} nodeId
    */
   focusNode(nodeId) {
-    const node = this.graphStore.getNode(nodeId);
-    if (!node) return;
+    this.focusedNodeId = nodeId;
     
-    // Temporarily strengthen links to connected nodes
-    const connectedIds = new Set();
-    for (const edge of this.graphStore.edges.values()) {
-      if (edge.sourceId === nodeId) connectedIds.add(edge.targetId);
-      if (edge.targetId === nodeId) connectedIds.add(edge.sourceId);
-    }
+    // Update link strengths
+    this.simulation.force('link').strength(d => this.getLinkStrength(d));
     
+    // Reduce distance for connected links
+    this.simulation.force('link').distance(d => {
+      const sourceId = typeof d.source === 'object' ? d.source.id : d.source;
+      const targetId = typeof d.target === 'object' ? d.target.id : d.target;
+      
+      if (sourceId === nodeId || targetId === nodeId) {
+        return this.linkDistance * 0.6; // Pull connected nodes closer
+      }
+      return this.linkDistance;
+    });
+    
+    this.reheat(0.3);
+  }
+
+  /**
+   * Clear focus - restore default link behavior.
+   */
+  clearFocus() {
+    this.focusedNodeId = null;
+    
+    // Restore default link behavior
     this.simulation.force('link')
-      .distance(d => {
-        if (d.source.id === nodeId || d.target.id === nodeId) {
-          return this.linkDistance * 0.7;
-        }
-        return this.linkDistance;
-      })
-      .strength(d => {
-        if (d.source.id === nodeId || d.target.id === nodeId) {
-          return this.linkStrength * 1.5;
-        }
-        return this.linkStrength;
-      });
-    
-    this.reheat(0.2);
-    
-    // Reset after settling
-    setTimeout(() => {
-      this.simulation.force('link')
-        .distance(this.linkDistance)
-        .strength(this.linkStrength);
-    }, 2000);
+      .strength(d => this.getLinkStrength(d))
+      .distance(this.linkDistance);
   }
 
   /**

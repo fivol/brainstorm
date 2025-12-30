@@ -28,7 +28,7 @@ const Canvas = observer(function Canvas() {
     const renderer = new CanvasRenderer(svgRef.current, graphStore, uiStore);
     rendererRef.current = renderer;
     
-    const simulation = new ForceSimulation(graphStore);
+    const simulation = new ForceSimulation(graphStore, uiStore);
     simulationRef.current = simulation;
     
     // Wire up callbacks
@@ -95,9 +95,15 @@ const Canvas = observer(function Canvas() {
     } else if (node.state === NodeState.EDITABLE) {
       // Already editable, do nothing
     } else {
+      // Clear previous focus
+      if (simulationRef.current) {
+        simulationRef.current.clearFocus();
+      }
+      
       // Make active
       uiStore.setActiveNode(nodeId);
-      // Focus on connected nodes
+      
+      // Focus on connected nodes - selective strengthening
       if (simulationRef.current) {
         simulationRef.current.focusNode(nodeId);
       }
@@ -133,16 +139,23 @@ const Canvas = observer(function Canvas() {
     
     uiStore.setDraggingNode(nodeId);
     
-    // If starting edge creation from active node
+    // Track start position for undo
+    dragStateRef.current = {
+      isDragging: true,
+      startX: node.x,
+      startY: node.y
+    };
+    
+    // If starting edge creation from active node (Alt/Option + drag)
     if (node.state === NodeState.ACTIVE && event.sourceEvent?.altKey) {
       uiStore.startEdgeCreation(nodeId);
       return;
     }
     
-    // Fix position during drag
+    // Fix position during drag and heat up simulation
     if (simulationRef.current) {
       simulationRef.current.fixNode(nodeId, node.x, node.y);
-      simulationRef.current.reheat(0.1);
+      simulationRef.current.startDrag(nodeId); // Heat up for responsive collision
     }
   }, [graphStore, uiStore]);
 
@@ -216,11 +229,13 @@ const Canvas = observer(function Canvas() {
       });
     }
     
-    // Release fixed position
+    // Release fixed position and let simulation cool down
     if (simulationRef.current) {
       simulationRef.current.releaseNode(nodeId);
-      simulationRef.current.reheat(0.2);
+      simulationRef.current.endDrag(); // Allow natural settling
     }
+    
+    dragStateRef.current.isDragging = false;
   }, [graphStore, uiStore, undoStore]);
 
   // Find node at position
