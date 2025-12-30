@@ -1,11 +1,11 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { observer } from 'mobx-react-lite';
-import { Canvas, Controls, HelpPanel, ToastContainer, DevConsole, TitleInput } from './components';
-import { StoreContext, graphStore, uiStore, undoStore } from './stores';
+import { Canvas, Controls, HelpPanel, ToastContainer, DevConsole, TitleInput, AIModal } from './components';
+import { StoreContext, graphStore, uiStore, undoStore, aiStore } from './stores';
 import { PersistenceService } from './services/persistence';
 import './App.css';
 
-const stores = { graphStore, uiStore, undoStore };
+const stores = { graphStore, uiStore, undoStore, aiStore };
 
 /**
  * Main application component.
@@ -13,6 +13,16 @@ const stores = { graphStore, uiStore, undoStore };
 const App = observer(function App() {
   const persistenceRef = useRef(null);
   const canvasRef = useRef(null);
+
+  // Track changes for beforeunload prompt
+  const handleBeforeUnload = useCallback((e) => {
+    // Check if there are nodes in the graph
+    if (graphStore.nodes.size > 0) {
+      e.preventDefault();
+      e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      return e.returnValue;
+    }
+  }, []);
 
   useEffect(() => {
     // Initialize persistence
@@ -26,11 +36,15 @@ const App = observer(function App() {
     };
     window.addEventListener('brainstorm:fit-view', handleFitView);
     
+    // Add beforeunload handler
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
     return () => {
       persistence.stop();
       window.removeEventListener('brainstorm:fit-view', handleFitView);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, []);
+  }, [handleBeforeUnload]);
 
   return (
     <StoreContext.Provider value={stores}>
@@ -41,6 +55,7 @@ const App = observer(function App() {
         <HelpPanel />
         <ToastContainer />
         <DevConsole />
+        <AIModal />
       </div>
     </StoreContext.Provider>
   );

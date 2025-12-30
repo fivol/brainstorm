@@ -1,6 +1,7 @@
 import { graphStore } from './GraphStore';
 import { uiStore } from './UIStore';
 import { undoStore } from './UndoStore';
+import { aiStore } from './AIStore';
 
 // Wire up store references
 graphStore.setUndoStore(undoStore);
@@ -9,7 +10,7 @@ uiStore.setGraphStore(graphStore);
 undoStore.setGraphStore(graphStore);
 undoStore.setUIStore(uiStore);
 
-export { graphStore, uiStore, undoStore };
+export { graphStore, uiStore, undoStore, aiStore };
 
 // Export store context for React
 import { createContext, useContext } from 'react';
@@ -17,7 +18,8 @@ import { createContext, useContext } from 'react';
 export const StoreContext = createContext({
   graphStore,
   uiStore,
-  undoStore
+  undoStore,
+  aiStore
 });
 
 export function useStores() {
@@ -34,4 +36,8 @@ export function useUIStore() {
 
 export function useUndoStore() {
   return useContext(StoreContext).undoStore;
+}
+
+export function useAIStore() {
+  return useContext(StoreContext).aiStore;
 }

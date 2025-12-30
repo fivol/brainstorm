@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useStores } from '../stores';
 import { CanvasRenderer } from '../canvas/CanvasRenderer';
@@ -12,7 +12,10 @@ import './Canvas.css';
  * Integrates D3 rendering with React and MobX.
  */
 const Canvas = observer(function Canvas() {
-  const { graphStore, uiStore, undoStore } = useStores();
+  const { graphStore, uiStore, undoStore, aiStore } = useStores();
+  
+  // Virtual cards selection state
+  const [selectedVirtualCard, setSelectedVirtualCard] = useState(null);
   const svgRef = useRef(null);
   const rendererRef = useRef(null);
   const simulationRef = useRef(null);
@@ -519,6 +522,99 @@ const Canvas = observer(function Canvas() {
     
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
     
+    // Clear virtual cards on most actions (except navigation within them)
+    const shouldClearVirtualCards = !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' '].includes(event.key);
+    if (shouldClearVirtualCards && aiStore.virtualCards.length > 0 && !(event.ctrlKey && event.key === ' ')) {
+      aiStore.clearVirtualCards();
+      setSelectedVirtualCard(null);
+    }
+    
+    // Ctrl+Space - trigger AI suggestions
+    if ((event.ctrlKey || event.metaKey) && event.key === ' ') {
+      event.preventDefault();
+      if (activeNode && activeNode.state !== NodeState.EDITABLE && aiStore.isConfigured) {
+        aiStore.generateSuggestions(graphStore, activeNode.id, 3);
+        setSelectedVirtualCard(0);
+      } else if (!aiStore.isConfigured) {
+        aiStore.openModal();
+        uiStore.info('Configure AI to get suggestions');
+      }
+      return;
+    }
+    
+    // Handle virtual cards navigation and selection
+    if (aiStore.virtualCards.length > 0 && activeNode && activeNode.state === NodeState.ACTIVE) {
+      const cards = aiStore.virtualCards;
+      
+      // Arrow navigation between virtual cards
+      if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
+        event.preventDefault();
+        setSelectedVirtualCard(prev => 
+          prev === null ? 0 : Math.min(prev + 1, cards.length - 1)
+        );
+        return;
+      }
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        setSelectedVirtualCard(prev => 
+          prev === null ? 0 : Math.max(prev - 1, 0)
+        );
+        return;
+      }
+      
+      // Enter to accept selected virtual card
+      if (event.key === 'Enter' && selectedVirtualCard !== null) {
+        event.preventDefault();
+        const card = cards[selectedVirtualCard];
+        if (card) {
+          // Find best position for new node (to the right of current node, or other side if busy)
+          const offset = 200;
+          let newX = activeNode.x + activeNode.w + offset;
+          let newY = activeNode.y;
+          
+          // Check if right side is busy (has a node nearby)
+          const existingNodes = graphStore.getNodes();
+          const rightSideBusy = existingNodes.some(n => 
+            n.id !== activeNode.id && 
+            n.x > activeNode.x && 
+            Math.abs(n.x - newX) < 100 && 
+            Math.abs(n.y - newY) < 50
+          );
+          
+          if (rightSideBusy) {
+            // Try left side
+            newX = activeNode.x - offset - 160;
+          }
+          
+          // Create the real node
+          const newNode = graphStore.createNode({ x: newX, y: newY, text: card.text });
+          graphStore.createEdge(activeNode.id, newNode.id);
+          
+          aiStore.clearVirtualCards();
+          setSelectedVirtualCard(null);
+          
+          uiStore.setActiveNode(newNode.id);
+          
+          if (simulationRef.current) {
+            simulationRef.current.update();
+            simulationRef.current.reheat(0.3);
+          }
+          
+          rendererRef.current.centerOnNode(newNode.id);
+          rendererRef.current.render();
+        }
+        return;
+      }
+      
+      // Escape to close virtual cards
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        aiStore.clearVirtualCards();
+        setSelectedVirtualCard(null);
+        return;
+      }
+    }
+    
     // Global shortcuts
     if ((event.metaKey || event.ctrlKey) && event.key === 'z') {
       if (event.shiftKey) {
@@ -712,27 +808,61 @@ const Canvas = observer(function Canvas() {
       return;
     }
     
-    // Arrow key navigation
+    // Arrow key navigation - moves to closest node in direction (connected nodes prioritized)
     if (event.key.startsWith('Arrow') && activeNode && activeNode.state !== NodeState.EDITABLE) {
       const connectedNodes = graphStore.getConnectedNodes(activeNode.id);
-      if (connectedNodes.length === 0) return;
+      const allNodes = graphStore.getNodes().filter(n => n.id !== activeNode.id);
+      
+      if (allNodes.length === 0) return;
       
       // Find node in the arrow direction
       const dir = event.key.replace('Arrow', '').toLowerCase();
-      let bestNode = null;
-      let bestScore = -Infinity;
       
-      for (const node of connectedNodes) {
+      // Helper to calculate score for a node in the given direction
+      const calculateScore = (node, isConnected) => {
         const dx = node.x - activeNode.x;
         const dy = node.y - activeNode.y;
         
-        let score = 0;
+        // Check if node is in the correct direction
+        let inDirection = false;
+        let dirScore = 0;
         switch (dir) {
-          case 'up': score = -dy - Math.abs(dx) * 0.5; break;
-          case 'down': score = dy - Math.abs(dx) * 0.5; break;
-          case 'left': score = -dx - Math.abs(dy) * 0.5; break;
-          case 'right': score = dx - Math.abs(dy) * 0.5; break;
+          case 'up': 
+            inDirection = dy < 0; 
+            dirScore = -dy - Math.abs(dx) * 0.5;
+            break;
+          case 'down': 
+            inDirection = dy > 0; 
+            dirScore = dy - Math.abs(dx) * 0.5;
+            break;
+          case 'left': 
+            inDirection = dx < 0; 
+            dirScore = -dx - Math.abs(dy) * 0.5;
+            break;
+          case 'right': 
+            inDirection = dx > 0; 
+            dirScore = dx - Math.abs(dy) * 0.5;
+            break;
         }
+        
+        // If not in direction, return very low score
+        if (!inDirection) return -Infinity;
+        
+        // Connected nodes get a bonus
+        const connectionBonus = isConnected ? 10000 : 0;
+        
+        return dirScore + connectionBonus;
+      };
+      
+      let bestNode = null;
+      let bestScore = -Infinity;
+      
+      // Check all nodes, but prioritize connected ones
+      const connectedIds = new Set(connectedNodes.map(n => n.id));
+      
+      for (const node of allNodes) {
+        const isConnected = connectedIds.has(node.id);
+        const score = calculateScore(node, isConnected);
         
         if (score > bestScore) {
           bestScore = score;
@@ -839,16 +969,167 @@ const Canvas = observer(function Canvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  // Handle virtual card click
+  const handleVirtualCardClick = useCallback((cardIndex) => {
+    const card = aiStore.virtualCards[cardIndex];
+    if (!card) return;
+    
+    const activeNode = graphStore.getNode(uiStore.activeNodeId);
+    if (!activeNode) return;
+    
+    // Find best position for new node
+    const offset = 200;
+    let newX = activeNode.x + activeNode.w + offset;
+    let newY = activeNode.y;
+    
+    // Check if right side is busy
+    const existingNodes = graphStore.getNodes();
+    const rightSideBusy = existingNodes.some(n => 
+      n.id !== activeNode.id && 
+      n.x > activeNode.x && 
+      Math.abs(n.x - newX) < 100 && 
+      Math.abs(n.y - newY) < 50
+    );
+    
+    if (rightSideBusy) {
+      newX = activeNode.x - offset - 160;
+    }
+    
+    // Create the real node
+    const newNode = graphStore.createNode({ x: newX, y: newY, text: card.text });
+    graphStore.createEdge(activeNode.id, newNode.id);
+    
+    aiStore.clearVirtualCards();
+    setSelectedVirtualCard(null);
+    
+    uiStore.setActiveNode(newNode.id);
+    
+    if (simulationRef.current) {
+      simulationRef.current.update();
+      simulationRef.current.reheat(0.3);
+    }
+    
+    rendererRef.current.centerOnNode(newNode.id);
+    rendererRef.current.render();
+  }, [graphStore, uiStore, aiStore]);
+
+  // Calculate virtual card positions
+  const getVirtualCardPositions = useCallback(() => {
+    if (aiStore.virtualCards.length === 0) return [];
+    
+    const activeNode = graphStore.getNode(uiStore.activeNodeId);
+    if (!activeNode) return [];
+    
+    const { x: viewX, y: viewY, scale } = uiStore.view;
+    const cardWidth = 160;
+    const cardHeight = 44;
+    const gap = 20;
+    const offset = 80;
+    
+    return aiStore.virtualCards.map((card, index) => {
+      // Position to the right of the active node
+      const canvasX = activeNode.x + activeNode.w + offset;
+      const canvasY = activeNode.y + (index * (cardHeight + gap));
+      
+      // Convert to screen coordinates
+      const screenX = canvasX * scale + viewX;
+      const screenY = canvasY * scale + viewY;
+      
+      return {
+        ...card,
+        index,
+        x: screenX,
+        y: screenY,
+        width: cardWidth * scale,
+        height: cardHeight * scale,
+        // Arrow start point (from active node)
+        arrowStartX: (activeNode.x + activeNode.w) * scale + viewX,
+        arrowStartY: (activeNode.y + activeNode.h / 2) * scale + viewY,
+        // Arrow end point (to virtual card)
+        arrowEndX: screenX,
+        arrowEndY: screenY + (cardHeight * scale) / 2
+      };
+    });
+  }, [graphStore, uiStore, aiStore.virtualCards]);
+
+  const virtualCardPositions = getVirtualCardPositions();
+
   return (
-    <svg
-      ref={svgRef}
-      className="graph-canvas"
-      onClick={handleCanvasClick}
-      onMouseDown={handleCanvasMouseDown}
-      onMouseMove={handleCanvasMouseMove}
-      onMouseUp={handleCanvasMouseUp}
-      onMouseLeave={handleCanvasMouseUp}
-    />
+    <>
+      <svg
+        ref={svgRef}
+        className="graph-canvas"
+        onClick={handleCanvasClick}
+        onMouseDown={handleCanvasMouseDown}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseUp={handleCanvasMouseUp}
+        onMouseLeave={handleCanvasMouseUp}
+      />
+      
+      {/* Virtual Cards Overlay */}
+      {virtualCardPositions.length > 0 && (
+        <div className="virtual-cards-overlay">
+          {/* Curved dotted arrows */}
+          <svg className="virtual-arrows-svg">
+            <defs>
+              <marker
+                id="virtual-arrow-head"
+                markerWidth="8"
+                markerHeight="8"
+                refX="6"
+                refY="4"
+                orient="auto"
+              >
+                <path d="M0,0 L8,4 L0,8 L2,4 Z" fill="var(--info-color)" opacity="0.6" />
+              </marker>
+            </defs>
+            {virtualCardPositions.map((card, index) => {
+              const controlX = card.arrowStartX + (card.arrowEndX - card.arrowStartX) * 0.5;
+              const controlY = card.arrowStartY;
+              return (
+                <path
+                  key={`arrow-${index}`}
+                  d={`M ${card.arrowStartX} ${card.arrowStartY} Q ${controlX} ${controlY} ${card.arrowEndX} ${card.arrowEndY}`}
+                  fill="none"
+                  stroke="var(--info-color)"
+                  strokeWidth="2"
+                  strokeDasharray="6 4"
+                  opacity={selectedVirtualCard === index ? 0.8 : 0.4}
+                  markerEnd="url(#virtual-arrow-head)"
+                />
+              );
+            })}
+          </svg>
+          
+          {/* Virtual cards */}
+          {virtualCardPositions.map((card, index) => (
+            <div
+              key={card.id}
+              className={`virtual-card ${selectedVirtualCard === index ? 'virtual-card-selected' : ''}`}
+              style={{
+                left: card.x,
+                top: card.y,
+                width: card.width,
+                minHeight: card.height,
+                transform: `scale(${1})`,
+              }}
+              onClick={() => handleVirtualCardClick(index)}
+              onMouseEnter={() => setSelectedVirtualCard(index)}
+            >
+              <span className="virtual-card-text">{card.text}</span>
+            </div>
+          ))}
+          
+          {/* Loading indicator */}
+          {aiStore.loadingSuggestions && (
+            <div className="virtual-cards-loading">
+              <span className="virtual-spinner" />
+              Generating suggestions...
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 });
 

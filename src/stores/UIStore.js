@@ -91,6 +91,10 @@ class UIStore {
           this.graphStore.deleteNode(this.activeNodeId, false);
         } else if (prevNode.state !== NodeState.MULTI_SELECTED) {
           this.graphStore.setNodeState(this.activeNodeId, NodeState.INACTIVE);
+          // Auto-set title from first node when deselecting an editable node
+          if (prevNode.state === NodeState.EDITABLE) {
+            this.graphStore.autoSetTitleFromFirstNode();
+          }
         }
       }
     }
@@ -141,6 +145,10 @@ class UIStore {
       if (node && node.state === NodeState.EDITABLE && !node.text?.trim()) {
         this.graphStore.deleteNode(this.activeNodeId, false);
       } else if (node) {
+        // Auto-set title from first node when deselecting an editable node
+        if (node.state === NodeState.EDITABLE) {
+          this.graphStore.autoSetTitleFromFirstNode();
+        }
         this.graphStore.setNodeState(this.activeNodeId, NodeState.INACTIVE);
       }
     }

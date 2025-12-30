@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useStores } from '../stores';
 import './Controls.css';
@@ -7,9 +7,17 @@ import './Controls.css';
  * Control panel overlay component.
  */
 const Controls = observer(function Controls({ canvasRef }) {
-  const { graphStore, uiStore, undoStore } = useStores();
+  const { graphStore, uiStore, undoStore, aiStore } = useStores();
   const fileInputRef = useRef(null);
   const [showRecent, setShowRecent] = useState(false);
+  const [recentDocs, setRecentDocs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('brainstorm-recent');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
   const handleClear = () => {
     graphStore.clear();
@@ -98,18 +106,21 @@ const Controls = observer(function Controls({ canvasRef }) {
   };
 
   const handleToggleRecent = () => {
+    if (!showRecent) {
+      reloadRecentDocs();
+    }
     setShowRecent(!showRecent);
   };
 
-  // Recent documents management
-  const getRecentDocuments = () => {
+  // Reload recent documents from localStorage
+  const reloadRecentDocs = useCallback(() => {
     try {
       const saved = localStorage.getItem('brainstorm-recent');
-      return saved ? JSON.parse(saved) : [];
+      setRecentDocs(saved ? JSON.parse(saved) : []);
     } catch {
-      return [];
+      setRecentDocs([]);
     }
-  };
+  }, []);
 
   const saveCurrentToRecent = () => {
     const nodes = graphStore.getNodes();
@@ -118,28 +129,45 @@ const Controls = observer(function Controls({ canvasRef }) {
       return;
     }
     
-    const recent = getRecentDocuments();
     const data = graphStore.toJSON(true);
     const name = graphStore.title || `Untitled ${new Date().toLocaleDateString()}`;
-    const id = Date.now().toString();
     
-    const newDoc = {
-      id,
-      name,
-      blocksCount: nodes.length,
-      updatedAt: Date.now(),
-      data
-    };
+    // Check if document with same name already exists
+    const existingIndex = recentDocs.findIndex(d => d.name === name);
     
-    // Add to beginning
-    recent.unshift(newDoc);
+    let updatedDocs;
+    if (existingIndex !== -1) {
+      // Replace existing document with same name
+      updatedDocs = [...recentDocs];
+      updatedDocs[existingIndex] = {
+        ...updatedDocs[existingIndex],
+        blocksCount: nodes.length,
+        updatedAt: Date.now(),
+        data
+      };
+      // Move to top
+      const [doc] = updatedDocs.splice(existingIndex, 1);
+      updatedDocs.unshift(doc);
+    } else {
+      // Create new document
+      const id = Date.now().toString();
+      const newDoc = {
+        id,
+        name,
+        blocksCount: nodes.length,
+        updatedAt: Date.now(),
+        data
+      };
+      updatedDocs = [newDoc, ...recentDocs];
+    }
     
     // Keep only last 20
-    const limited = recent.slice(0, 20);
+    const limited = updatedDocs.slice(0, 20);
     
     try {
       localStorage.setItem('brainstorm-recent', JSON.stringify(limited));
-      uiStore.info('Saved to Recent');
+      setRecentDocs(limited);
+      uiStore.info(existingIndex !== -1 ? 'Updated in Recent' : 'Saved to Recent');
     } catch {
       uiStore.error('Failed to save');
     }
@@ -154,18 +182,18 @@ const Controls = observer(function Controls({ canvasRef }) {
     uiStore.info(`Loaded: ${doc.name}`);
     
     // Update the document's updatedAt time
-    const recent = getRecentDocuments();
-    const updated = recent.map(d => 
+    const updated = recentDocs.map(d => 
       d.id === doc.id ? { ...d, updatedAt: Date.now() } : d
     ).sort((a, b) => b.updatedAt - a.updatedAt);
     localStorage.setItem('brainstorm-recent', JSON.stringify(updated));
+    setRecentDocs(updated);
   };
 
   const deleteFromRecent = (id, e) => {
     e.stopPropagation();
-    const recent = getRecentDocuments();
-    const filtered = recent.filter(d => d.id !== id);
+    const filtered = recentDocs.filter(d => d.id !== id);
     localStorage.setItem('brainstorm-recent', JSON.stringify(filtered));
+    setRecentDocs(filtered);
     uiStore.info('Removed from Recent');
   };
 
@@ -185,8 +213,6 @@ const Controls = observer(function Controls({ canvasRef }) {
     // Otherwise show date
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
-
-  const recentDocs = getRecentDocuments();
 
   return (
     <>
@@ -331,15 +357,27 @@ const Controls = observer(function Controls({ canvasRef }) {
         
         <div className="controls-divider" />
         
-        <button 
-          className="control-btn" 
-          onClick={handleHelp}
-          data-tooltip="Help"
-        >
-          <svg viewBox="0 0 24 24" width="18" height="18">
-            <path fill="currentColor" d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
-          </svg>
-        </button>
+        <div className="controls-group">
+          <button 
+            className={`control-btn ${aiStore.isConfigured ? 'control-btn-ai-configured' : ''}`}
+            onClick={() => aiStore.openModal()}
+            data-tooltip="AI Settings"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path fill="currentColor" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+            </svg>
+          </button>
+          
+          <button 
+            className="control-btn" 
+            onClick={handleHelp}
+            data-tooltip="Help"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path fill="currentColor" d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z"/>
+            </svg>
+          </button>
+        </div>
       </div>
       
       {/* Recent Documents Panel */}

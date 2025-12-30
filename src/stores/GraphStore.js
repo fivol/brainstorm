@@ -184,8 +184,7 @@ class GraphStore {
     // Recalculate size based on state
     this.recalculateNodeSize(nodeId);
     
-    // Auto-set title from first word of first node if title is empty
-    this.autoSetTitleFromFirstNode();
+    // Don't auto-set title here - it's set when node is deselected
     
     if (recordUndo && this.undoStore && oldText !== text) {
       this.undoStore.push({
@@ -197,7 +196,8 @@ class GraphStore {
   }
   
   /**
-   * Auto-set title from first word of earliest node if title is empty.
+   * Auto-set title from first 3 words of earliest node if title is empty.
+   * Called when node is deselected, not during typing.
    */
   autoSetTitleFromFirstNode() {
     // Only auto-set if title is empty
@@ -214,10 +214,10 @@ class GraphStore {
     const text = firstNode.text?.trim();
     if (!text) return;
     
-    // Get first word
-    const firstWord = text.split(/\s+/)[0];
-    if (firstWord) {
-      this.setTitle(firstWord);
+    // Get first 3 words max
+    const words = text.split(/\s+/).slice(0, 3).join(' ');
+    if (words) {
+      this.setTitle(words);
     }
   }
 
@@ -453,12 +453,12 @@ class GraphStore {
 
   /**
    * Clear the entire graph.
+   * Note: Does not clear the title - title persists across clears.
    */
   clear() {
     this.nodes.clear();
     this.edges.clear();
-    this.title = '';
-    document.title = 'BrainStorm';
+    // Don't clear title - it persists across clears
     if (this.undoStore) {
       this.undoStore.clear();
     }

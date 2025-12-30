@@ -4,3 +4,4 @@ export { default as HelpPanel } from './HelpPanel';
 export { ToastContainer } from './Toast';
 export { DevConsole } from './DevConsole';
 export { TitleInput } from './TitleInput';
+export { AIModal } from './AIModal';

@@ -71,6 +71,14 @@
   color: var(--error-color);
 }
 
+.control-btn-ai-configured {
+  color: var(--success-color);
+}
+
+.control-btn-ai-configured:hover:not(:disabled) {
+  background: rgba(52, 168, 83, 0.15);
+}
+
 .control-btn svg {
   flex-shrink: 0;
 }
@@ -187,6 +195,7 @@
 .recent-list {
   max-height: 320px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .recent-empty {
@@ -256,8 +265,10 @@
   align-items: center;
   justify-content: center;
   width: 24px;
+  min-width: 24px;
   height: 24px;
   padding: 0;
+  margin-left: 8px;
   background: transparent;
   border: none;
   border-radius: 4px;
@@ -266,6 +277,7 @@
   transition: background 0.15s, color 0.15s;
   opacity: 0;
   position: relative;
+  flex-shrink: 0;
 }
 
 .recent-item:hover .recent-item-delete {

@@ -53,3 +53,102 @@
 .graph-canvas .selection-rect {
   pointer-events: none;
 }
+
+/* Virtual Cards */
+.virtual-cards-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.virtual-arrows-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.virtual-card {
+  position: absolute;
+  padding: 10px 14px;
+  background: var(--panel-bg);
+  border: 2px dashed var(--info-color);
+  border-radius: 10px;
+  color: var(--text-color);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0.85;
+  transition: all 0.15s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  animation: virtual-card-appear 0.2s ease-out;
+}
+
+@keyframes virtual-card-appear {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 0.85;
+    transform: translateX(0);
+  }
+}
+
+.virtual-card:hover,
+.virtual-card-selected {
+  opacity: 1;
+  border-color: var(--info-color);
+  border-style: solid;
+  background: rgba(26, 115, 232, 0.08);
+  box-shadow: 0 4px 12px rgba(26, 115, 232, 0.2);
+  transform: scale(1.02);
+}
+
+.virtual-card-text {
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.virtual-cards-loading {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 16px 24px;
+  background: var(--panel-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-color);
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  pointer-events: auto;
+  animation: virtual-card-appear 0.2s ease-out;
+}
+
+.virtual-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--info-color);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
