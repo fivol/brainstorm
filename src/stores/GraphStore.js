@@ -184,12 +184,40 @@ class GraphStore {
     // Recalculate size based on state
     this.recalculateNodeSize(nodeId);
     
+    // Auto-set title from first word of first node if title is empty
+    this.autoSetTitleFromFirstNode();
+    
     if (recordUndo && this.undoStore && oldText !== text) {
       this.undoStore.push({
         type: ActionType.EDIT_NODE_TEXT,
         data: { nodeId, oldText },
         reverseData: { nodeId, newText: text }
       });
+    }
+  }
+  
+  /**
+   * Auto-set title from first word of earliest node if title is empty.
+   */
+  autoSetTitleFromFirstNode() {
+    // Only auto-set if title is empty
+    if (this.title) return;
+    
+    // Find the first (earliest) node by createdAt
+    const nodes = this.getNodes();
+    if (nodes.length === 0) return;
+    
+    const firstNode = nodes.reduce((earliest, node) => 
+      node.createdAt < earliest.createdAt ? node : earliest
+    , nodes[0]);
+    
+    const text = firstNode.text?.trim();
+    if (!text) return;
+    
+    // Get first word
+    const firstWord = text.split(/\s+/)[0];
+    if (firstWord) {
+      this.setTitle(firstWord);
     }
   }
 
