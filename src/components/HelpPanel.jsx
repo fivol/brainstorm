@@ -132,6 +132,10 @@ const HelpPanel = observer(function HelpPanel() {
               <strong>BrainStorm</strong> — a visual tool for brainstorming and organizing ideas. 
               Create nodes, connect them with edges, and build mind maps effortlessly.
             </p>
+            <p className="help-description-ai">
+              <strong>AI-Powered:</strong> Get intelligent suggestions as you work. 
+              The AI analyzes your mind map context and proposes relevant ideas to expand your thinking.
+            </p>
           </div>
           
           <div className="help-examples">
@@ -163,7 +167,7 @@ const HelpPanel = observer(function HelpPanel() {
             <h3>Node Creation</h3>
             <ul>
               <li><kbd>Click</kbd> empty space — Create new node</li>
-              <li><kbd>Tab</kbd> — Create new node at center</li>
+              <li><kbd>Tab</kbd> — Create new node (deselect current)</li>
               <li><kbd>Enter</kbd> (no selection) — Create node at center</li>
               <li><kbd>Ctrl/⌘ + Arrow</kbd> — Create connected node in direction</li>
             </ul>
@@ -193,7 +197,7 @@ const HelpPanel = observer(function HelpPanel() {
           <section className="help-section">
             <h3>Edge Creation</h3>
             <ul>
-              <li><kbd>Alt + Drag</kbd> from active node — Create edge</li>
+              <li><kbd>Ctrl/⌘/Alt + Drag</kbd> from any node — Create edge</li>
               <li>Release on node — Connect to existing node</li>
               <li>Release on empty — Create new node and connect</li>
             </ul>
@@ -215,6 +219,33 @@ const HelpPanel = observer(function HelpPanel() {
           </section>
           
           <section className="help-section">
+            <h3>AI Assistance</h3>
+            <ul>
+              <li><kbd>Ctrl/⌘ + P</kbd> — Open AI prompt (generate nodes)</li>
+              <li><kbd>Ctrl/⌘ + Space</kbd> — Get AI suggestions for selected node</li>
+              <li><kbd>↑</kbd> / <kbd>↓</kbd> — Navigate between suggestions</li>
+              <li><kbd>Enter</kbd> — Accept selected suggestion</li>
+              <li><kbd>Escape</kbd> — Dismiss suggestions</li>
+            </ul>
+            <div className="help-ai-status">
+              <span className={`help-ai-indicator ${aiStore.isConfigured ? 'configured' : ''}`}></span>
+              <span>{aiStore.isConfigured ? 'AI Configured' : 'AI Not Configured'}</span>
+              {aiStore.isConfigured && !aiStore.autoSuggestionsEnabled && (
+                <span className="help-ai-manual-hint"> (manual mode: ⌘P)</span>
+              )}
+            </div>
+            <button 
+              className="help-ai-configure-btn"
+              onClick={() => {
+                uiStore.hideHelp();
+                aiStore.openModal();
+              }}
+            >
+              {aiStore.isConfigured ? 'AI Settings' : 'Configure AI'}
+            </button>
+          </section>
+          
+          <section className="help-section">
             <h3>Dev Mode</h3>
             <ul>
               <li><kbd>F8</kbd> — Toggle dev console</li>
@@ -227,33 +258,6 @@ const HelpPanel = observer(function HelpPanel() {
               }}
             >
               Open Dev Console
-            </button>
-          </section>
-          
-          <section className="help-section help-section-ai">
-            <h3>AI Assistant</h3>
-            <p className="help-ai-desc">
-              Use AI to generate ideas and expand your mind map. Configure an API key to enable AI features.
-            </p>
-            <ul>
-              <li><kbd>Ctrl/⌘ + P</kbd> — Open AI prompt (generate nodes)</li>
-              <li><kbd>Ctrl + Space</kbd> — Get AI suggestions for selected node</li>
-              <li><kbd>↑</kbd> / <kbd>↓</kbd> — Navigate between suggestions</li>
-              <li><kbd>Enter</kbd> — Accept selected suggestion</li>
-              <li><kbd>Escape</kbd> — Dismiss suggestions</li>
-            </ul>
-            <div className="help-ai-status">
-              <span className={`help-ai-indicator ${aiStore.isConfigured ? 'configured' : ''}`}></span>
-              <span>{aiStore.isConfigured ? 'AI Configured' : 'AI Not Configured'}</span>
-            </div>
-            <button 
-              className="help-ai-configure-btn"
-              onClick={() => {
-                uiStore.hideHelp();
-                aiStore.openModal();
-              }}
-            >
-              {aiStore.isConfigured ? 'AI Settings' : 'Configure AI'}
             </button>
           </section>
           </div>

@@ -85,6 +85,7 @@ class AIStore {
   /** Feature toggles */
   hintsEnabled = true;
   generateEnabled = true;
+  autoSuggestionsEnabled = true;
   
   /** AI generation state */
   generateInputVisible = false;
@@ -108,6 +109,7 @@ class AIStore {
         if (config.selectedModels) this.selectedModels = { ...this.selectedModels, ...config.selectedModels };
         if (config.hintsEnabled !== undefined) this.hintsEnabled = config.hintsEnabled;
         if (config.generateEnabled !== undefined) this.generateEnabled = config.generateEnabled;
+        if (config.autoSuggestionsEnabled !== undefined) this.autoSuggestionsEnabled = config.autoSuggestionsEnabled;
       }
     } catch (e) {
       console.warn('Failed to load AI config:', e);
@@ -124,7 +126,8 @@ class AIStore {
         apiKeys: this.apiKeys,
         selectedModels: this.selectedModels,
         hintsEnabled: this.hintsEnabled,
-        generateEnabled: this.generateEnabled
+        generateEnabled: this.generateEnabled,
+        autoSuggestionsEnabled: this.autoSuggestionsEnabled
       };
       localStorage.setItem(AI_STORAGE_KEY, JSON.stringify(config));
     } catch (e) {
@@ -145,6 +148,14 @@ class AIStore {
    */
   setGenerateEnabled(enabled) {
     this.generateEnabled = enabled;
+    this.saveConfig();
+  }
+  
+  /**
+   * Toggle auto suggestions enabled
+   */
+  setAutoSuggestionsEnabled(enabled) {
+    this.autoSuggestionsEnabled = enabled;
     this.saveConfig();
   }
   

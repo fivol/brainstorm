@@ -42,6 +42,10 @@ const AIModal = observer(function AIModal() {
     aiStore.setGenerateEnabled(!aiStore.generateEnabled);
   }, [aiStore]);
 
+  const handleAutoSuggestionsToggle = useCallback(() => {
+    aiStore.setAutoSuggestionsEnabled(!aiStore.autoSuggestionsEnabled);
+  }, [aiStore]);
+
   if (!aiStore.modalOpen) return null;
 
   const recommended = RecommendedModels[aiStore.provider];
@@ -199,13 +203,28 @@ const AIModal = observer(function AIModal() {
                   <span className="ai-toggle-desc">Generate nodes from tasks via AI icon</span>
                 </div>
               </label>
+              <label className="ai-toggle">
+                <input
+                  type="checkbox"
+                  checked={aiStore.autoSuggestionsEnabled}
+                  onChange={handleAutoSuggestionsToggle}
+                />
+                <span className="ai-toggle-slider"></span>
+                <div className="ai-toggle-content">
+                  <span className="ai-toggle-title">Auto Suggestions</span>
+                  <span className="ai-toggle-desc">Show suggestions automatically when editing a node (or use ⌘P)</span>
+                </div>
+              </label>
             </div>
           </div>
         </div>
 
         <div className="ai-modal-footer">
           <p className="ai-footer-hint">
-            Press <kbd>Ctrl</kbd>+<kbd>Space</kbd> on a selected node to get AI suggestions
+            {aiStore.autoSuggestionsEnabled 
+              ? 'Suggestions appear automatically after editing a node'
+              : <>Press <kbd>⌘/Ctrl</kbd>+<kbd>P</kbd> or <kbd>⌘/Ctrl</kbd>+<kbd>Space</kbd> to get AI suggestions</>
+            }
           </p>
         </div>
       </div>

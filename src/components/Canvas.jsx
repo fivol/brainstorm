@@ -212,9 +212,20 @@ const Canvas = observer(function Canvas() {
   const activeNodeForEffect = graphStore.getNode(uiStore.activeNodeId);
   const activeNodeState = activeNodeForEffect?.state;
   const activeNodeText = activeNodeForEffect?.text;
+  
+  // Track previous state to detect edit -> active transition
+  const prevNodeStateRef = useRef(null);
+  const prevActiveNodeIdRef = useRef(null);
 
-  // Auto-trigger AI suggestions when a node becomes active (not editable)
+  // Auto-trigger AI suggestions only on edit -> active transition (when auto-suggestions enabled)
   useEffect(() => {
+    const prevState = prevNodeStateRef.current;
+    const prevNodeId = prevActiveNodeIdRef.current;
+    
+    // Update refs for next render
+    prevNodeStateRef.current = activeNodeState;
+    prevActiveNodeIdRef.current = uiStore.activeNodeId;
+    
     if (!uiStore.activeNodeId) {
       // Clear suggestions when no node is active
       if (aiStore.virtualCards.length > 0) {
@@ -236,17 +247,33 @@ const Canvas = observer(function Canvas() {
       return;
     }
     
+    // Clear suggestions if switching to a different node (not staying on same node)
+    if (prevNodeId && prevNodeId !== uiStore.activeNodeId) {
+      if (aiStore.virtualCards.length > 0) {
+        aiStore.clearVirtualCards();
+        setSelectedVirtualCard(null);
+      }
+      // Don't auto-suggest when just navigating between nodes
+      return;
+    }
+    
     // Only show suggestions if:
     // - Node is active (not editable)
     // - Node has text content (not empty)
     // - AI is configured and hints are enabled
+    // - Auto suggestions are enabled
+    // - Previous state was EDITABLE (edit -> active transition)
+    const isEditToActiveTransition = prevState === NodeState.EDITABLE && activeNode.state === NodeState.ACTIVE;
+    
     if (
       activeNode.state === NodeState.ACTIVE &&
       activeNode.text?.trim() &&
       aiStore.isConfigured &&
-      aiStore.hintsEnabled
+      aiStore.hintsEnabled &&
+      aiStore.autoSuggestionsEnabled &&
+      isEditToActiveTransition
     ) {
-      // Generate suggestions immediately
+      // Generate suggestions after edit -> active transition
       aiStore.generateSuggestions(graphStore, uiStore.activeNodeId, 3)
         .then(() => {
           setSelectedVirtualCard(0);
@@ -261,6 +288,17 @@ const Canvas = observer(function Canvas() {
   const handleNodeClick = useCallback((nodeId, _event) => {
     const node = graphStore.getNode(nodeId);
     if (!node) return;
+    
+    // If clicking on an empty node (that was in editable mode but lost focus), remove it
+    if (!node.text?.trim() && node.state !== NodeState.EDITABLE) {
+      graphStore.deleteNode(nodeId, false);
+      uiStore.clearSelection();
+      if (simulationRef.current) {
+        simulationRef.current.update();
+      }
+      rendererRef.current.render();
+      return;
+    }
     
     if (node.state === NodeState.ACTIVE) {
       // Second click on active node -> editable
@@ -317,6 +355,9 @@ const Canvas = observer(function Canvas() {
     const node = graphStore.getNode(nodeId);
     if (!node || node.state === NodeState.EDITABLE) return;
     
+    const sourceEvent = event.sourceEvent;
+    const hasModifier = sourceEvent.metaKey || sourceEvent.ctrlKey || sourceEvent.altKey;
+    
     uiStore.setDraggingNode(nodeId);
     
     // Track start position for undo
@@ -326,13 +367,22 @@ const Canvas = observer(function Canvas() {
       startY: node.y
     };
     
-    // If dragging from an active node, start edge creation (per spec: drag from active node creates edge)
-    if (node.state === NodeState.ACTIVE) {
+    // Edge creation with modifier key (cmd/ctrl/alt + drag) - works on any node
+    if (hasModifier) {
+      // Make the node active first if not already
+      if (node.state !== NodeState.ACTIVE) {
+        uiStore.setActiveNode(nodeId);
+      }
       uiStore.startEdgeCreation(nodeId);
       // Initialize cursor position
-      const pos = rendererRef.current.screenToCanvas(event.sourceEvent.clientX, event.sourceEvent.clientY);
+      const pos = rendererRef.current.screenToCanvas(sourceEvent.clientX, sourceEvent.clientY);
       uiStore.updateEdgeCreation(pos.x, pos.y);
       return;
+    }
+    
+    // Plain drag = node movement (select if not already)
+    if (node.state !== NodeState.ACTIVE) {
+      uiStore.setActiveNode(nodeId);
     }
     
     // Fix position during drag and heat up simulation
@@ -688,8 +738,9 @@ const Canvas = observer(function Canvas() {
       return;
     }
     
-    // Handle virtual cards navigation with arrow keys
+    // Handle virtual cards navigation with Up/Down arrow keys only
     if (aiStore.virtualCards.length > 0 && activeNode && activeNode.state === NodeState.ACTIVE) {
+      // Up/Down for virtual card navigation
       if (event.key === 'ArrowUp') {
         event.preventDefault();
         setSelectedVirtualCard(prev => 
@@ -716,6 +767,12 @@ const Canvas = observer(function Canvas() {
         aiStore.clearVirtualCards();
         setSelectedVirtualCard(null);
         return;
+      }
+      // Left/Right arrows dismiss suggestions and navigate graph
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        aiStore.clearVirtualCards();
+        setSelectedVirtualCard(null);
+        // Continue to graph navigation below
       }
     }
     
@@ -893,12 +950,12 @@ const Canvas = observer(function Canvas() {
       return;
     }
     
-    // Tab - create new node
+    // Tab - create new node and deselect current
     if (event.key === 'Tab') {
-      // Skip if in editable mode (allow normal tab behavior or text input)
+      event.preventDefault();
+      
+      // If in editable mode, exit first
       if (activeNode?.state === NodeState.EDITABLE) {
-        event.preventDefault();
-        // Exit edit mode and create new node
         const nodeText = activeNode.text?.trim() || '';
         if (!nodeText) {
           graphStore.deleteNode(activeNode.id, false);
@@ -908,11 +965,8 @@ const Canvas = observer(function Canvas() {
         }
       }
       
-      // Don't create new node if there's already an active node
-      if (uiStore.activeNodeId) {
-        event.preventDefault();
-        return;
-      }
+      // Clear current selection first
+      uiStore.clearSelection();
       
       // Create new node in center of view, finding free space
       const { x, y, scale } = uiStore.view;
@@ -935,7 +989,6 @@ const Canvas = observer(function Canvas() {
       rendererRef.current.centerOnNode(node.id, false);
       rendererRef.current.render();
       setTimeout(() => focusNodeTextInput(node.id), 100);
-      event.preventDefault();
       return;
     }
     
@@ -1004,8 +1057,53 @@ const Canvas = observer(function Canvas() {
       return;
     }
     
+    // Ctrl/Cmd + Arrow: create connected node (check this first before plain arrow navigation)
+    if ((event.metaKey || event.ctrlKey) && event.key.startsWith('Arrow') && activeNode && activeNode.state !== NodeState.EDITABLE) {
+      event.preventDefault();
+      const dir = event.key.replace('Arrow', '').toLowerCase();
+      const offset = 200;
+      
+      let newX = activeNode.x;
+      let newY = activeNode.y;
+      
+      switch (dir) {
+        case 'up': newY -= offset; break;
+        case 'down': newY += offset; break;
+        case 'left': newX -= offset; break;
+        case 'right': newX += offset; break;
+      }
+      
+      // Clear AI suggestions when creating new connected node
+      if (aiStore.virtualCards.length > 0) {
+        aiStore.clearVirtualCards();
+        setSelectedVirtualCard(null);
+      }
+      
+      const newNode = graphStore.createNode({ x: newX, y: newY, text: '' });
+      graphStore.createEdge(activeNode.id, newNode.id);
+      uiStore.setActiveNode(newNode.id);
+      uiStore.setEditableNode(newNode.id);
+      
+      if (simulationRef.current) {
+        simulationRef.current.update();
+        simulationRef.current.reheat(0.3);
+      }
+      
+      // Center on new node and render
+      rendererRef.current.centerOnNode(newNode.id);
+      rendererRef.current.render();
+      setTimeout(() => focusNodeTextInput(newNode.id), 100);
+      return;
+    }
+    
     // Arrow key navigation - moves to closest node in direction (connected nodes prioritized)
     if (event.key.startsWith('Arrow') && activeNode && activeNode.state !== NodeState.EDITABLE) {
+      // Clear AI suggestions when navigating away
+      if (aiStore.virtualCards.length > 0) {
+        aiStore.clearVirtualCards();
+        setSelectedVirtualCard(null);
+      }
+      
       const connectedNodes = graphStore.getConnectedNodes(activeNode.id);
       const allNodes = graphStore.getNodes().filter(n => n.id !== activeNode.id);
       
@@ -1073,38 +1171,6 @@ const Canvas = observer(function Canvas() {
       }
       event.preventDefault();
       return;
-    }
-    
-    // Ctrl/Cmd + Arrow: create connected node
-    if ((event.metaKey || event.ctrlKey) && event.key.startsWith('Arrow') && activeNode) {
-      const dir = event.key.replace('Arrow', '').toLowerCase();
-      const offset = 200;
-      
-      let newX = activeNode.x;
-      let newY = activeNode.y;
-      
-      switch (dir) {
-        case 'up': newY -= offset; break;
-        case 'down': newY += offset; break;
-        case 'left': newX -= offset; break;
-        case 'right': newX += offset; break;
-      }
-      
-      const newNode = graphStore.createNode({ x: newX, y: newY, text: '' });
-      graphStore.createEdge(activeNode.id, newNode.id);
-      uiStore.setActiveNode(newNode.id);
-      uiStore.setEditableNode(newNode.id);
-      
-      if (simulationRef.current) {
-        simulationRef.current.update();
-        simulationRef.current.reheat(0.3);
-      }
-      
-      // Center on new node and render
-      rendererRef.current.centerOnNode(newNode.id);
-      rendererRef.current.render();
-      setTimeout(() => focusNodeTextInput(newNode.id), 100);
-      event.preventDefault();
     }
   }, [graphStore, uiStore, undoStore, openAIPromptInput, aiStore, handleVirtualCardClick, selectedVirtualCard]);
 
@@ -1312,18 +1378,24 @@ const Canvas = observer(function Canvas() {
 
   const aiIconPosition = getAIIconPosition();
 
-  // Calculate virtual card positions - positioned near the active node
+  // Calculate virtual card positions - positioned to the right of the active node
   const getVirtualCardPositions = useCallback(() => {
     if (aiStore.virtualCards.length === 0) return [];
+    
+    // Don't show virtual cards when AI prompt input is visible
+    if (showAIInput) return [];
     
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
     if (!activeNode) return [];
     
+    // Don't show virtual cards for empty nodes
+    if (!activeNode.text?.trim()) return [];
+    
     const { x: viewX, y: viewY, scale } = uiStore.view;
     const cardWidth = 160;
-    const cardHeight = 40;
-    const gap = 8;
-    const offsetFromNode = 20;
+    const cardHeight = 50;
+    const gap = 12;
+    const offsetFromNode = 60; // Increased offset to avoid tooltip overlap
     
     // Position to the right of the node
     const nodeRightX = (activeNode.x + activeNode.w / 2 + offsetFromNode) * scale + viewX;
@@ -1352,7 +1424,7 @@ const Canvas = observer(function Canvas() {
         arrowEndY: screenY + cardHeight / 2
       };
     });
-  }, [graphStore, uiStore, aiStore.virtualCards]);
+  }, [graphStore, uiStore, aiStore.virtualCards, showAIInput]);
 
   const virtualCardPositions = getVirtualCardPositions();
 
@@ -1436,13 +1508,13 @@ const Canvas = observer(function Canvas() {
             <defs>
               <marker
                 id="virtual-arrow-head"
-                markerWidth="8"
-                markerHeight="8"
-                refX="6"
-                refY="4"
+                markerWidth="4"
+                markerHeight="4"
+                refX="3"
+                refY="2"
                 orient="auto"
               >
-                <path d="M0,0 L8,4 L0,8 L2,4 Z" fill="var(--info-color)" opacity="0.6" />
+                <path d="M0,0 L4,2 L0,4 Z" fill="var(--info-color)" opacity="0.7" />
               </marker>
             </defs>
             {virtualCardPositions.map((card, index) => {
@@ -1454,9 +1526,9 @@ const Canvas = observer(function Canvas() {
                   d={`M ${card.arrowStartX} ${card.arrowStartY} Q ${controlX} ${controlY} ${card.arrowEndX} ${card.arrowEndY}`}
                   fill="none"
                   stroke="var(--info-color)"
-                  strokeWidth="2"
-                  strokeDasharray="6 4"
-                  opacity={selectedVirtualCard === index ? 0.8 : 0.4}
+                  strokeWidth="1.5"
+                  strokeDasharray="4 3"
+                  opacity={selectedVirtualCard === index ? 0.8 : 0.5}
                   markerEnd="url(#virtual-arrow-head)"
                 />
               );

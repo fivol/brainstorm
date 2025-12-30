@@ -74,7 +74,7 @@
   position: fixed;
   padding: 12px 16px;
   background: var(--panel-bg);
-  border: 1px solid var(--border-color);
+  border: 2px dashed var(--border-color);
   border-radius: var(--radius-lg);
   color: var(--text-color);
   font-size: 13px;
@@ -84,9 +84,9 @@
   text-align: left;
   cursor: pointer;
   pointer-events: auto;
-  opacity: 0.95;
+  opacity: 1;
   transition: all var(--transition-fast);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   animation: virtual-card-appear var(--transition-normal);
 }
 
@@ -116,10 +116,10 @@
 
 .virtual-card:hover,
 .virtual-card-selected {
-  opacity: 1;
   border-color: var(--info-color);
-  background: rgba(26, 115, 232, 0.06);
-  box-shadow: 0 4px 16px rgba(26, 115, 232, 0.15);
+  border-style: solid;
+  background: var(--panel-bg);
+  box-shadow: 0 4px 16px rgba(26, 115, 232, 0.2);
   transform: translateX(-4px);
 }
 

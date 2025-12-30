@@ -213,20 +213,13 @@ kbd {
   color: var(--text-muted);
 }
 
-/* AI Section */
-.help-section-ai {
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
-  border: 1px solid rgba(102, 126, 234, 0.15);
-  border-radius: var(--radius-lg);
-  padding: 16px;
-  margin-top: 8px;
-}
-
-.help-ai-desc {
+/* AI Description in header */
+.help-description-ai {
+  margin-top: 12px;
   font-size: 13px;
   color: var(--text-muted);
-  margin: 0 0 12px 0;
-  line-height: 1.5;
+  padding-left: 12px;
+  border-left: 2px solid var(--info-color);
 }
 
 .help-ai-status {
@@ -236,6 +229,12 @@ kbd {
   margin-top: 12px;
   font-size: 12px;
   color: var(--text-muted);
+  flex-wrap: wrap;
+}
+
+.help-ai-manual-hint {
+  color: var(--text-muted);
+  font-size: 11px;
 }
 
 .help-ai-indicator {
