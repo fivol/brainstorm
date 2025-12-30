@@ -9,6 +9,9 @@ class UIStore {
   /** Currently active node ID (single selection) */
   activeNodeId = null;
   
+  /** Previously selected node ID (for restore on delete) */
+  previousNodeId = null;
+  
   /** Currently selected edge ID */
   selectedEdgeId = null;
   
@@ -72,12 +75,22 @@ class UIStore {
    * @param {string | null} nodeId
    */
   setActiveNode(nodeId) {
-    // Deactivate previous node
+    // Deactivate previous node and check if empty
     if (this.activeNodeId && this.graphStore) {
       const prevNode = this.graphStore.getNode(this.activeNodeId);
-      if (prevNode && prevNode.state !== NodeState.MULTI_SELECTED) {
-        this.graphStore.setNodeState(this.activeNodeId, NodeState.INACTIVE);
+      if (prevNode) {
+        // Check if node is empty and should be deleted (on deselection)
+        if (prevNode.state === NodeState.EDITABLE && !prevNode.text?.trim()) {
+          this.graphStore.deleteNode(this.activeNodeId, false);
+        } else if (prevNode.state !== NodeState.MULTI_SELECTED) {
+          this.graphStore.setNodeState(this.activeNodeId, NodeState.INACTIVE);
+        }
       }
+    }
+    
+    // Track previous node for restore on delete
+    if (this.activeNodeId && nodeId !== this.activeNodeId) {
+      this.previousNodeId = this.activeNodeId;
     }
     
     this.activeNodeId = nodeId;
@@ -116,11 +129,32 @@ class UIStore {
    */
   clearSelection() {
     if (this.activeNodeId && this.graphStore) {
-      this.graphStore.setNodeState(this.activeNodeId, NodeState.INACTIVE);
+      const node = this.graphStore.getNode(this.activeNodeId);
+      // Check if node is empty and should be deleted (on deselection)
+      if (node && node.state === NodeState.EDITABLE && !node.text?.trim()) {
+        this.graphStore.deleteNode(this.activeNodeId, false);
+      } else if (node) {
+        this.graphStore.setNodeState(this.activeNodeId, NodeState.INACTIVE);
+      }
     }
     this.activeNodeId = null;
     this.selectedEdgeId = null;
     this.clearMultiSelection();
+  }
+  
+  /**
+   * Get previous node ID for restore on delete.
+   * @returns {string | null}
+   */
+  getPreviousNodeId() {
+    return this.previousNodeId;
+  }
+  
+  /**
+   * Clear previous node tracking.
+   */
+  clearPreviousNode() {
+    this.previousNodeId = null;
   }
 
   // ============== Multi Selection ==============

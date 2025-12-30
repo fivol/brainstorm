@@ -11,10 +11,8 @@ const Controls = observer(function Controls({ canvasRef }) {
   const fileInputRef = useRef(null);
 
   const handleClear = () => {
-    if (confirm('Clear all nodes and edges? This cannot be undone.')) {
-      graphStore.clear();
-      uiStore.info('Graph cleared');
-    }
+    graphStore.clear();
+    uiStore.info('Graph cleared');
   };
 
   const handleFitView = () => {

@@ -498,6 +498,30 @@ export class CanvasRenderer {
   }
 
   /**
+   * Center view on a specific node.
+   * @param {string} nodeId - Node to center on
+   * @param {boolean} [animate=true] - Whether to animate the transition
+   */
+  centerOnNode(nodeId, animate = true) {
+    const node = this.graphStore.getNode(nodeId);
+    if (!node) return;
+    
+    const currentScale = this.uiStore.view.scale;
+    const translateX = this.width / 2 - node.x * currentScale;
+    const translateY = this.height / 2 - node.y * currentScale;
+    
+    const transform = d3.zoomIdentity.translate(translateX, translateY).scale(currentScale);
+    
+    if (animate) {
+      this.svg.transition()
+        .duration(300)
+        .call(this.zoom.transform, transform);
+    } else {
+      this.svg.call(this.zoom.transform, transform);
+    }
+  }
+
+  /**
    * Update dimensions on resize.
    */
   resize() {

@@ -18,6 +18,12 @@ class GraphStore {
   
   /** Reference to UI store (set after initialization) */
   uiStore = null;
+  
+  // Default size for new nodes (consistent initial size)
+  static DEFAULT_NODE_WIDTH = 120;
+  static DEFAULT_NODE_HEIGHT = 44;
+  // Max width for nodes (~6 words)
+  static MAX_NODE_WIDTH = 200;
 
   constructor() {
     makeAutoObservable(this, {
@@ -48,17 +54,27 @@ class GraphStore {
     const id = data.id || generateId();
     const now = Date.now();
     
-    // Calculate initial size
     const text = data.text || '';
-    const measured = measureText(text, undefined, 200);
+    
+    // If text is provided (e.g., from import), calculate size
+    // Otherwise use default size for new empty nodes (all new nodes same size)
+    let w, h;
+    if (text) {
+      const measured = measureText(text, undefined, GraphStore.MAX_NODE_WIDTH);
+      w = Math.min(GraphStore.MAX_NODE_WIDTH, Math.max(80, measured.width + 32));
+      h = Math.max(40, measured.height + 24);
+    } else {
+      w = GraphStore.DEFAULT_NODE_WIDTH;
+      h = GraphStore.DEFAULT_NODE_HEIGHT;
+    }
     
     const node = {
       id,
       text,
       x: data.x ?? 0,
       y: data.y ?? 0,
-      w: Math.max(80, measured.width + 32),
-      h: Math.max(40, measured.height + 24),
+      w,
+      h,
       state: data.state ?? NodeState.INACTIVE,
       createdAt: data.createdAt ?? now,
       updatedAt: data.updatedAt ?? now,
@@ -176,6 +192,7 @@ class GraphStore {
 
   /**
    * Recalculate node size based on content and state.
+   * Node grows horizontally up to MAX_NODE_WIDTH (~6 words), then grows vertically.
    * @param {string} nodeId
    */
   recalculateNodeSize(nodeId) {
@@ -183,15 +200,19 @@ class GraphStore {
     if (!node) return;
     
     const isExpanded = node.state === NodeState.ACTIVE || node.state === NodeState.EDITABLE;
-    const maxWidth = isExpanded ? 400 : 200;
+    
+    // Always use MAX_NODE_WIDTH as the limit - nodes grow horizontally to this width,
+    // then grow vertically. This ensures ~6 words per line.
+    const maxWidth = GraphStore.MAX_NODE_WIDTH;
     
     const measured = measureText(node.text, undefined, maxWidth);
     
     // Padding: 16px horizontal, 12px vertical
-    node.w = Math.max(80, measured.width + 32);
-    node.h = Math.max(40, measured.height + 24);
+    // Width grows up to maxWidth, then wraps and height grows
+    node.w = Math.min(maxWidth, Math.max(GraphStore.DEFAULT_NODE_WIDTH, measured.width + 32));
+    node.h = Math.max(GraphStore.DEFAULT_NODE_HEIGHT, measured.height + 24);
     
-    // For inactive state, limit height to ~3 lines
+    // For inactive state, limit height to ~3 lines (truncated view)
     if (!isExpanded && measured.lines.length > 3) {
       node.h = 3 * 20 + 24;
     }

@@ -223,8 +223,9 @@ const Canvas = observer(function Canvas() {
         simulationRef.current.reheat(0.3);
       }
       
-      // If a new node was created, render and focus it
+      // If a new node was created, center on it, render and focus it
       if (newNodeId) {
+        rendererRef.current.centerOnNode(newNodeId);
         rendererRef.current.render();
         setTimeout(() => focusNodeTextInput(newNodeId), 100);
       }
@@ -297,10 +298,10 @@ const Canvas = observer(function Canvas() {
       simulationRef.current.reheat(0.2);
     }
     
-    // Render immediately to create the DOM element, then focus
+    // Center on new node and render
+    rendererRef.current.centerOnNode(node.id, false);
     rendererRef.current.render();
     setTimeout(() => focusNodeTextInput(node.id), 100);
-    uiStore.info('Node created');
   }, [graphStore, uiStore]);
 
   // Handle canvas drag for rectangular selection
@@ -368,7 +369,7 @@ const Canvas = observer(function Canvas() {
     rendererRef.current.render();
   }, [graphStore, uiStore]);
 
-  const handleCanvasMouseUp = useCallback((event) => {
+  const handleCanvasMouseUp = useCallback(() => {
     if (dragStateRef.current.isRectSelect) {
       // Mark that we just finished a rect selection to prevent click from creating a node
       justFinishedRectSelection.current = true;
@@ -398,8 +399,35 @@ const Canvas = observer(function Canvas() {
       return;
     }
     
-    // Delete selected
+    // Cmd+Delete/Backspace - delete current node and restore previous selection
+    if ((event.metaKey || event.ctrlKey) && (event.key === 'Delete' || event.key === 'Backspace')) {
+      if (activeNode && activeNode.state !== NodeState.EDITABLE) {
+        const previousId = uiStore.getPreviousNodeId();
+        const previousNode = previousId ? graphStore.getNode(previousId) : null;
+        
+        graphStore.deleteNode(activeNode.id);
+        
+        // Restore previous selection if it still exists
+        if (previousNode) {
+          uiStore.setActiveNode(previousId);
+          rendererRef.current.centerOnNode(previousId);
+        } else {
+          uiStore.clearSelection();
+        }
+        
+        uiStore.info('Node deleted');
+        if (simulationRef.current) simulationRef.current.update();
+        rendererRef.current.render();
+        event.preventDefault();
+        return;
+      }
+    }
+    
+    // Delete selected (without modifier)
     if (event.key === 'Delete' || event.key === 'Backspace') {
+      // Skip if in editable mode (let text editing handle it)
+      if (activeNode?.state === NodeState.EDITABLE) return;
+      
       if (uiStore.selectedEdgeId) {
         graphStore.deleteEdge(uiStore.selectedEdgeId);
         uiStore.setSelectedEdge(null);
@@ -409,7 +437,7 @@ const Canvas = observer(function Canvas() {
       }
       
       const selectedIds = uiStore.getSelectedNodeIds();
-      if (selectedIds.length > 0 && !activeNode?.state === NodeState.EDITABLE) {
+      if (selectedIds.length > 0) {
         for (const id of selectedIds) {
           graphStore.deleteNode(id);
         }
@@ -481,7 +509,7 @@ const Canvas = observer(function Canvas() {
       }
       
       if (!uiStore.activeNodeId) {
-        // Create new node in center
+        // Create new node in center of view
         const { x, y, scale } = uiStore.view;
         const centerX = (rendererRef.current.width / 2 - x) / scale;
         const centerY = (rendererRef.current.height / 2 - y) / scale;
@@ -495,7 +523,8 @@ const Canvas = observer(function Canvas() {
           simulationRef.current.reheat(0.2);
         }
         
-        // Render immediately to create the DOM element, then focus
+        // Center on new node and render
+        rendererRef.current.centerOnNode(node.id, false);
         rendererRef.current.render();
         setTimeout(() => focusNodeTextInput(node.id), 100);
         event.preventDefault();
@@ -533,6 +562,7 @@ const Canvas = observer(function Canvas() {
       
       if (bestNode) {
         uiStore.setActiveNode(bestNode.id);
+        rendererRef.current.centerOnNode(bestNode.id);
         rendererRef.current.render();
       }
       event.preventDefault();
@@ -564,7 +594,8 @@ const Canvas = observer(function Canvas() {
         simulationRef.current.reheat(0.3);
       }
       
-      // Render immediately to create the DOM element, then focus
+      // Center on new node and render
+      rendererRef.current.centerOnNode(newNode.id);
       rendererRef.current.render();
       setTimeout(() => focusNodeTextInput(newNode.id), 100);
       event.preventDefault();
