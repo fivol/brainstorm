@@ -1,88 +1,92 @@
 import * as d3 from 'd3'
 
-/**
- * Build a forest (multiple trees) from blocks and connections.
- * Returns an array of root nodes, each with a hierarchical structure.
- */
-export const buildHierarchyFromConnections = (blocks, connections) => {
-  if (blocks.length === 0) return []
+// Store simulation instance for reuse
+let currentSimulation = null
 
-  // Create a map of block id to block
-  const blockMap = new Map(blocks.map(b => [b.id, { ...b }]))
-  
-  // Track which blocks have incoming connections (children)
-  const hasIncoming = new Set()
-  connections.forEach(conn => {
-    hasIncoming.add(conn.to)
-  })
-  
-  // Find root nodes (blocks with no incoming connections)
-  const rootIds = blocks
-    .filter(b => !hasIncoming.has(b.id))
-    .map(b => b.id)
-  
-  // If no roots found (circular references), use all blocks as roots
-  if (rootIds.length === 0 && blocks.length > 0) {
-    rootIds.push(blocks[0].id)
+/**
+ * Create a force-directed graph simulation for universal graph layout.
+ * Works with any graph structure: cycles, multiple parents, disconnected components.
+ */
+export const createForceSimulation = (
+  blocks,
+  connections,
+  canvasWidth = window.innerWidth,
+  canvasHeight = window.innerHeight,
+  onTick = null
+) => {
+  // Stop any existing simulation
+  if (currentSimulation) {
+    currentSimulation.stop()
   }
-  
-  // Build adjacency list for children
-  const childrenMap = new Map()
-  connections.forEach(conn => {
-    if (!childrenMap.has(conn.from)) {
-      childrenMap.set(conn.from, [])
-    }
-    childrenMap.get(conn.from).push(conn.to)
-  })
-  
-  // Build tree structure recursively
-  const visited = new Set()
-  
-  const buildNode = (blockId, depth = 0) => {
-    if (visited.has(blockId) || depth > 100) return null
-    visited.add(blockId)
-    
-    const block = blockMap.get(blockId)
-    if (!block) return null
-    
-    const childIds = childrenMap.get(blockId) || []
-    const children = childIds
-      .map(id => buildNode(id, depth + 1))
-      .filter(n => n !== null)
-    
-    return {
-      id: block.id,
-      block: block,
-      children: children.length > 0 ? children : undefined
-    }
+
+  if (blocks.length === 0) return null
+
+  // Create nodes array with current positions
+  const nodes = blocks.map(block => ({
+    id: block.id,
+    x: block.x + (block.width || 200) / 2, // Use center position
+    y: block.y + (block.height || 100) / 2,
+    width: block.width || 200,
+    height: block.height || 100,
+    fx: null, // Fixed x (null = not fixed)
+    fy: null  // Fixed y (null = not fixed)
+  }))
+
+  // Create links array from connections
+  const links = connections.map(conn => ({
+    source: conn.from,
+    target: conn.to
+  }))
+
+  // Calculate center of canvas
+  const centerX = canvasWidth / 2
+  const centerY = canvasHeight / 2
+
+  // Create force simulation
+  const simulation = d3.forceSimulation(nodes)
+    // Link force - connected nodes attract
+    .force('link', d3.forceLink(links)
+      .id(d => d.id)
+      .distance(250) // Preferred distance between connected nodes
+      .strength(0.8)  // How strongly links pull nodes together
+    )
+    // Charge force - nodes repel each other
+    .force('charge', d3.forceManyBody()
+      .strength(-800) // Negative = repulsion
+      .distanceMin(100)
+      .distanceMax(800)
+    )
+    // Center force - keep graph centered
+    .force('center', d3.forceCenter(centerX, centerY)
+      .strength(0.1)
+    )
+    // Collision force - prevent node overlap
+    .force('collision', d3.forceCollide()
+      .radius(d => Math.max(d.width, d.height) / 2 + 30)
+      .strength(0.9)
+    )
+    // X positioning force - spread horizontally
+    .force('x', d3.forceX(centerX).strength(0.02))
+    // Y positioning force - spread vertically
+    .force('y', d3.forceY(centerY).strength(0.02))
+    // Simulation parameters
+    .alphaDecay(0.02)  // How quickly simulation cools down
+    .velocityDecay(0.4) // Friction
+
+  // Set up tick callback if provided
+  if (onTick) {
+    simulation.on('tick', () => onTick(nodes))
   }
-  
-  // Build forest (array of trees)
-  const trees = []
-  rootIds.forEach(rootId => {
-    const tree = buildNode(rootId)
-    if (tree) trees.push(tree)
-  })
-  
-  // Add orphan blocks (not connected to any tree) as single-node trees
-  blocks.forEach(block => {
-    if (!visited.has(block.id)) {
-      trees.push({
-        id: block.id,
-        block: block,
-        children: undefined
-      })
-    }
-  })
-  
-  return trees
+
+  currentSimulation = simulation
+  return simulation
 }
 
 /**
- * Calculate hierarchical layout positions for all blocks.
- * Returns a Map of blockId -> { x, y }
+ * Run force simulation and return final positions.
+ * This runs the simulation to completion (synchronously).
  */
-export const calculateHierarchicalLayout = (
+export const calculateForceLayout = (
   blocks,
   connections,
   canvasWidth = window.innerWidth,
@@ -91,53 +95,65 @@ export const calculateHierarchicalLayout = (
   const positionMap = new Map()
   
   if (blocks.length === 0) return positionMap
-  
-  const trees = buildHierarchyFromConnections(blocks, connections)
-  
-  if (trees.length === 0) return positionMap
-  
-  // Layout configuration
-  const nodeWidth = 220  // Block width + margin
-  const nodeHeight = 120 // Block height + margin
-  const treePadding = 100 // Space between trees
-  const topPadding = 100
-  const leftPadding = 100
-  
-  let currentX = leftPadding
-  
-  trees.forEach((treeData, treeIndex) => {
-    // Create d3 hierarchy from tree data
-    const root = d3.hierarchy(treeData)
-    
-    // Calculate tree dimensions
-    const treeWidth = Math.max(1, root.leaves().length) * nodeWidth
-    const treeHeight = (root.height + 1) * nodeHeight
-    
-    // Create tree layout
-    const treeLayout = d3.tree()
-      .size([treeWidth, treeHeight])
-      .separation((a, b) => (a.parent === b.parent ? 1 : 1.2))
-    
-    // Apply layout
-    treeLayout(root)
-    
-    // Extract positions for each node
-    root.each(node => {
-      // Swap x and y for horizontal layout (top to bottom becomes left to right)
-      // node.x is the horizontal position in the tree
-      // node.y is the depth (vertical position)
-      positionMap.set(node.data.id, {
-        x: currentX + node.y, // Depth becomes X (left to right)
-        y: topPadding + node.x, // Spread becomes Y (top to bottom)
-        depth: node.depth,
-        isRoot: node.depth === 0
-      })
+
+  // Create nodes array with current positions
+  const nodes = blocks.map(block => ({
+    id: block.id,
+    x: block.x + (block.width || 200) / 2,
+    y: block.y + (block.height || 100) / 2,
+    width: block.width || 200,
+    height: block.height || 100
+  }))
+
+  // Create links array from connections
+  const links = connections.map(conn => ({
+    source: conn.from,
+    target: conn.to
+  }))
+
+  // Calculate center of canvas
+  const centerX = canvasWidth / 2
+  const centerY = canvasHeight / 2
+
+  // Create and run simulation
+  const simulation = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links)
+      .id(d => d.id)
+      .distance(250)
+      .strength(0.8)
+    )
+    .force('charge', d3.forceManyBody()
+      .strength(-800)
+      .distanceMin(100)
+      .distanceMax(800)
+    )
+    .force('center', d3.forceCenter(centerX, centerY)
+      .strength(0.1)
+    )
+    .force('collision', d3.forceCollide()
+      .radius(d => Math.max(d.width, d.height) / 2 + 30)
+      .strength(0.9)
+    )
+    .force('x', d3.forceX(centerX).strength(0.02))
+    .force('y', d3.forceY(centerY).strength(0.02))
+    .alphaDecay(0.05)
+    .velocityDecay(0.4)
+    .stop() // Don't auto-start
+
+  // Run simulation for a fixed number of iterations
+  const iterations = 150
+  for (let i = 0; i < iterations; i++) {
+    simulation.tick()
+  }
+
+  // Extract final positions (convert from center to top-left)
+  nodes.forEach(node => {
+    positionMap.set(node.id, {
+      x: node.x - node.width / 2,
+      y: node.y - node.height / 2
     })
-    
-    // Move to next tree position
-    currentX += treeHeight + treePadding
   })
-  
+
   return positionMap
 }
 
@@ -176,8 +192,7 @@ export const getLayoutBounds = (positionMap, blocks) => {
  */
 export const generateBezierPath = (
   fromX, fromY,
-  toX, toY,
-  curveStrength = 0.5
+  toX, toY
 ) => {
   // Determine if connection is more horizontal or vertical
   const dx = Math.abs(toX - fromX)
@@ -203,23 +218,6 @@ export const generateBezierPath = (
       source: { x: fromX, y: fromY },
       target: { x: toX, y: toY }
     })
-  }
-}
-
-/**
- * Calculate the tangent angle at the end of a bezier curve.
- * Used for arrowhead rotation.
- */
-export const calculateEndTangent = (fromX, fromY, toX, toY) => {
-  const dx = Math.abs(toX - fromX)
-  const dy = Math.abs(toY - fromY)
-  
-  // For horizontal links, the tangent at the end is horizontal
-  if (dx > dy) {
-    return toX > fromX ? 0 : Math.PI
-  } else {
-    // For vertical links, the tangent at the end is vertical
-    return toY > fromY ? Math.PI / 2 : -Math.PI / 2
   }
 }
 
@@ -276,3 +274,12 @@ export const findConnectionPoints = (
   return { fromX, fromY, toX, toY }
 }
 
+/**
+ * Stop the current simulation if running.
+ */
+export const stopSimulation = () => {
+  if (currentSimulation) {
+    currentSimulation.stop()
+    currentSimulation = null
+  }
+}

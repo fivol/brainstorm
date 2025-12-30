@@ -1,6 +1,6 @@
 import { makeAutoObservable, runInAction } from 'mobx'
 import { getBlockDimensions, resolveCollisions, measureTextWidth } from '../utils/blockUtils'
-import { calculateHierarchicalLayout, getLayoutBounds } from '../utils/layoutUtils'
+import { calculateForceLayout, getLayoutBounds } from '../utils/layoutUtils'
 
 class BlocksStore {
   blocks = []
@@ -37,7 +37,7 @@ class BlocksStore {
   // Handle window resize - recalculate layout
   handleWindowResize() {
     if (this.autoLayoutEnabled && this.connections.length > 0) {
-      this.applyHierarchicalLayout()
+      this.applyForceLayout()
     }
   }
 
@@ -274,7 +274,7 @@ class BlocksStore {
             if (this.autoLayoutEnabled) {
               // Delay slightly to allow the connection to be rendered first
               setTimeout(() => {
-                this.applyHierarchicalLayout()
+                this.applyForceLayout()
               }, 50)
             }
           }
@@ -300,19 +300,19 @@ class BlocksStore {
       )
       // Recalculate layout after connection removal
       if (this.autoLayoutEnabled) {
-        this.applyHierarchicalLayout()
+        this.applyForceLayout()
       }
     })
   }
 
-  // Apply hierarchical layout to all blocks
-  applyHierarchicalLayout() {
+  // Apply force-directed graph layout to all blocks
+  applyForceLayout() {
     if (this.blocks.length === 0) return
     
     const canvasWidth = window.innerWidth
     const canvasHeight = window.innerHeight
     
-    const positionMap = calculateHierarchicalLayout(
+    const positionMap = calculateForceLayout(
       this.blocks,
       this.connections,
       canvasWidth,
@@ -347,14 +347,14 @@ class BlocksStore {
     runInAction(() => {
       this.autoLayoutEnabled = !this.autoLayoutEnabled
       if (this.autoLayoutEnabled && this.connections.length > 0) {
-        this.applyHierarchicalLayout()
+        this.applyForceLayout()
       }
     })
   }
 
   // Manually trigger layout
   reorganizeLayout() {
-    this.applyHierarchicalLayout()
+    this.applyForceLayout()
   }
 
   // Fit all blocks in viewport
