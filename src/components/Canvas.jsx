@@ -22,6 +22,9 @@ const Canvas = observer(function Canvas() {
   
   // Track if we just finished a rect selection (to prevent creating node on mouseup)
   const justFinishedRectSelection = useRef(false);
+  
+  // Track if we just deselected an empty node (to prevent creating new node on canvas click)
+  const justDeletedEmptyNode = useRef(false);
 
   // Initialize renderer and simulation
   useEffect(() => {
@@ -101,18 +104,16 @@ const Canvas = observer(function Canvas() {
     
     // Handle first visit complete - create first node
     const handleFirstVisitComplete = () => {
-      // Create first node in center of view
-      const { x, y, scale } = uiStore.view;
-      const centerX = (renderer.width / 2 - x) / scale;
-      const centerY = (renderer.height / 2 - y) / scale;
-      
-      const node = graphStore.createNode({ x: centerX, y: centerY, text: '' });
+      // Create first node at canvas origin (0, 0) - this will be centered
+      // Using 0,0 ensures the node is at the logical center regardless of view state
+      const node = graphStore.createNode({ x: 0, y: 0, text: '' });
       uiStore.setActiveNode(node.id);
       uiStore.setEditableNode(node.id);
       
       simulation.update();
       simulation.reheat(0.2);
       
+      // Center the view on the new node (which is at 0,0)
       renderer.centerOnNode(node.id, false);
       renderer.render();
       
@@ -343,6 +344,12 @@ const Canvas = observer(function Canvas() {
       return;
     }
     
+    // Skip if we just deleted an empty node (clicked to deselect empty editable node)
+    if (justDeletedEmptyNode.current) {
+      justDeletedEmptyNode.current = false;
+      return;
+    }
+    
     // Check if click is on canvas background (not on nodes/edges)
     const target = event.target;
     const isBackground = target.classList.contains('canvas-background') || 
@@ -356,6 +363,19 @@ const Canvas = observer(function Canvas() {
     // Check if clicking on a node first
     const clickedNode = findNodeAtPosition(pos.x, pos.y);
     if (clickedNode) return;
+    
+    // Check if there's currently an empty editable node that will be deleted
+    const activeNode = graphStore.getNode(uiStore.activeNodeId);
+    if (activeNode && activeNode.state === NodeState.EDITABLE && !activeNode.text?.trim()) {
+      // This click will deselect and delete the empty node - don't create a new one
+      justDeletedEmptyNode.current = true;
+      uiStore.clearSelection();
+      if (simulationRef.current) {
+        simulationRef.current.update();
+      }
+      rendererRef.current.render();
+      return;
+    }
     
     // Create new node at click position
     const node = graphStore.createNode({ x: pos.x, y: pos.y, text: '' });
@@ -623,6 +643,13 @@ const Canvas = observer(function Canvas() {
       }
       
       if (!uiStore.activeNodeId) {
+        // If there are existing nodes (e.g., from loaded example), don't create new one
+        // Instead, do nothing and let user click on a node to select it
+        if (graphStore.nodes.size > 0) {
+          event.preventDefault();
+          return;
+        }
+        
         // Create new node in center of view
         const { x, y, scale } = uiStore.view;
         const centerX = (rendererRef.current.width / 2 - x) / scale;

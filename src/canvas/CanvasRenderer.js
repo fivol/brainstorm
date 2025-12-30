@@ -86,8 +86,8 @@ export class CanvasRenderer {
         // Trackpad pinch-to-zoom uses ctrlKey
         // Regular scroll wheel doesn't
         if (event.ctrlKey) {
-          // Pinch zoom - use delta for zoom
-          return -event.deltaY * (event.deltaMode === 1 ? 0.05 : event.deltaMode ? 1 : 0.002);
+          // Pinch zoom - use delta for zoom (increased sensitivity 5x)
+          return -event.deltaY * (event.deltaMode === 1 ? 0.25 : event.deltaMode ? 5 : 0.01);
         }
         // Two-finger scroll - handled as pan, return 0 to not zoom
         return 0;
