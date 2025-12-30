@@ -682,18 +682,9 @@ const Canvas = observer(function Canvas() {
       return;
     }
     
-    const activeNode = graphStore.getNode(uiStore.activeNodeId);
-    
-    // Position near active node if available, otherwise center of screen
-    let screenX, screenY;
-    if (activeNode) {
-      const { x: viewX, y: viewY, scale } = uiStore.view;
-      screenX = (activeNode.x + activeNode.w / 2 + 20) * scale + viewX;
-      screenY = (activeNode.y - activeNode.h / 2 - 50) * scale + viewY;
-    } else {
-      screenX = window.innerWidth / 2 - 150;
-      screenY = window.innerHeight / 2 - 20;
-    }
+    // Always center the prompt in the viewport for better UX
+    const screenX = window.innerWidth / 2 - 170;
+    const screenY = window.innerHeight / 2 - 80;
     
     setAIInputPosition({ x: screenX, y: screenY });
     setShowAIInput(true);
@@ -703,7 +694,7 @@ const Canvas = observer(function Canvas() {
     setTimeout(() => {
       aiInputRef.current?.focus();
     }, 50);
-  }, [aiStore, graphStore, uiStore]);
+  }, [aiStore, uiStore]);
 
   // Handle keyboard events
   const handleKeyDown = useCallback((event) => {
@@ -725,11 +716,6 @@ const Canvas = observer(function Canvas() {
     if ((event.metaKey || event.ctrlKey) && event.key === 'p') {
       event.preventDefault();
       if (aiStore.generateEnabled) {
-        if (!aiStore.isConfigured) {
-          aiStore.openModal();
-          uiStore.info('Configure AI to use generate feature');
-          return;
-        }
         // Can work without active node or with active non-editable node
         if (!activeNode || activeNode.state !== NodeState.EDITABLE) {
           openAIPromptInput();
