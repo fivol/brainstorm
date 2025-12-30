@@ -3,7 +3,7 @@ import { observer } from 'mobx-react-lite';
 import { useStores } from '../stores';
 import { CanvasRenderer } from '../canvas/CanvasRenderer';
 import { ForceSimulation } from '../canvas/ForceSimulation';
-import { NodeState } from '../types';
+import { NodeState, ActionType } from '../types';
 import { pointInRect, findFreePosition } from '../utils/geometry';
 import './Canvas.css';
 
@@ -19,6 +19,9 @@ const Canvas = observer(function Canvas() {
   const [aiInputValue, setAIInputValue] = useState('');
   const [aiInputPosition, setAIInputPosition] = useState({ x: 0, y: 0 });
   const aiInputRef = useRef(null);
+  
+  // AI Suggestions (virtual cards) state
+  const [selectedVirtualCard, setSelectedVirtualCard] = useState(null);
   
   const svgRef = useRef(null);
   const rendererRef = useRef(null);
@@ -196,6 +199,50 @@ const Canvas = observer(function Canvas() {
     uiStore.rectSelection.active,
     uiStore.edgeCreation.active
   ]);
+
+  // Auto-trigger AI suggestions when a node becomes active
+  useEffect(() => {
+    if (!uiStore.activeNodeId) {
+      // Clear suggestions when no node is active
+      if (aiStore.virtualCards.length > 0) {
+        aiStore.clearVirtualCards();
+        setSelectedVirtualCard(null);
+      }
+      return;
+    }
+    
+    const activeNode = graphStore.getNode(uiStore.activeNodeId);
+    if (!activeNode) return;
+    
+    // Only show suggestions if:
+    // - Node is active (not editable)
+    // - Node has text content
+    // - AI is configured and hints are enabled
+    if (
+      activeNode.state === NodeState.ACTIVE &&
+      activeNode.text?.trim() &&
+      aiStore.isConfigured &&
+      aiStore.hintsEnabled
+    ) {
+      // Generate suggestions immediately
+      aiStore.generateSuggestions(graphStore, uiStore.activeNodeId, 3)
+        .then(() => {
+          setSelectedVirtualCard(0);
+        })
+        .catch((err) => {
+          console.error('Failed to generate AI suggestions:', err);
+        });
+    } else {
+      // Clear suggestions when node enters editable mode or has no text
+      if (aiStore.virtualCards.length > 0 && aiStore.suggestionsForNodeId === uiStore.activeNodeId) {
+        // Don't clear if node just entered editable mode but suggestions are for this node
+        if (activeNode.state === NodeState.EDITABLE) {
+          aiStore.clearVirtualCards();
+          setSelectedVirtualCard(null);
+        }
+      }
+    }
+  }, [uiStore.activeNodeId, graphStore, aiStore]);
 
   // Handle node click
   const handleNodeClick = useCallback((nodeId, _event) => {
@@ -1038,6 +1085,9 @@ const Canvas = observer(function Canvas() {
       const activeNode = graphStore.getNode(uiStore.activeNodeId);
       if (!activeNode) return;
       
+      // Collect all actions for batch undo
+      const batchActions = [];
+      
       // Create a mapping from short IDs to full IDs
       const idMap = new Map();
       
@@ -1046,7 +1096,7 @@ const Canvas = observer(function Canvas() {
         idMap.set(node.id.slice(-6), node.id);
       }
       
-      // Create new nodes
+      // Create new nodes (without recording undo individually)
       const baseOffset = 200;
       result.nodes.forEach((nodeData, index) => {
         const angle = (index / result.nodes.length) * Math.PI * 2;
@@ -1059,21 +1109,44 @@ const Canvas = observer(function Canvas() {
           x: newX, 
           y: newY, 
           text: nodeData.text 
-        });
+        }, false); // Don't record undo individually
         
         // Map the new short ID to the full ID
         idMap.set(nodeData.id, newNode.id);
+        
+        // Add to batch actions
+        batchActions.push({
+          type: ActionType.CREATE_NODE,
+          data: { nodeId: newNode.id },
+          reverseData: { node: { ...newNode } }
+        });
       });
       
-      // Create edges
+      // Create edges (without recording undo individually)
       result.edges.forEach((edgeData) => {
         const sourceId = idMap.get(edgeData.from);
         const targetId = idMap.get(edgeData.to);
         
         if (sourceId && targetId) {
-          graphStore.createEdge(sourceId, targetId);
+          const edge = graphStore.createEdge(sourceId, targetId, '', false); // Don't record undo individually
+          if (edge) {
+            batchActions.push({
+              type: ActionType.CREATE_EDGE,
+              data: { edgeId: edge.id },
+              reverseData: { edge: { ...edge } }
+            });
+          }
         }
       });
+      
+      // Push a single batch action for undo
+      if (batchActions.length > 0) {
+        undoStore.push({
+          type: ActionType.BATCH,
+          data: { actions: batchActions },
+          reverseData: {}
+        });
+      }
       
       // Update simulation and render
       if (simulationRef.current) {
@@ -1087,10 +1160,13 @@ const Canvas = observer(function Canvas() {
     
     setShowAIInput(false);
     setAIInputValue('');
-  }, [aiInputValue, aiStore, graphStore, uiStore]);
+  }, [aiInputValue, aiStore, graphStore, uiStore, undoStore]);
 
   // Handle AI input key down
   const handleAIInputKeyDown = useCallback((e) => {
+    // Stop propagation for all keys to prevent Canvas shortcuts
+    e.stopPropagation();
+    
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleAIInputSubmit();
@@ -1102,8 +1178,8 @@ const Canvas = observer(function Canvas() {
 
   const aiIconPosition = getAIIconPosition();
 
-  // Handle virtual card click (currently disabled)
-  /* const handleVirtualCardClick = useCallback((cardIndex) => {
+  // Handle virtual card click
+  const handleVirtualCardClick = useCallback((cardIndex) => {
     const card = aiStore.virtualCards[cardIndex];
     if (!card) return;
     
@@ -1144,10 +1220,10 @@ const Canvas = observer(function Canvas() {
     
     rendererRef.current.centerOnNode(newNode.id);
     rendererRef.current.render();
-  }, [graphStore, uiStore, aiStore]); */
+  }, [graphStore, uiStore, aiStore]);
 
-  // Calculate virtual card positions (currently disabled)
-  /* const getVirtualCardPositions = useCallback(() => {
+  // Calculate virtual card positions
+  const getVirtualCardPositions = useCallback(() => {
     if (aiStore.virtualCards.length === 0) return [];
     
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
@@ -1185,7 +1261,7 @@ const Canvas = observer(function Canvas() {
     });
   }, [graphStore, uiStore, aiStore.virtualCards]);
 
-  const virtualCardPositions = getVirtualCardPositions(); */
+  const virtualCardPositions = getVirtualCardPositions();
 
   return (
     <>
@@ -1210,9 +1286,7 @@ const Canvas = observer(function Canvas() {
           onClick={handleAIIconClick}
           title="Generate nodes with AI"
         >
-          <svg viewBox="0 0 24 24" width="16" height="16">
-            <path fill="currentColor" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-          </svg>
+          <span className="ai-icon-text">AI</span>
         </button>
       )}
       
@@ -1260,8 +1334,8 @@ const Canvas = observer(function Canvas() {
         </div>
       )}
       
-      {/* Virtual Cards Overlay - Hidden */}
-      {/* {virtualCardPositions.length > 0 && (
+      {/* Virtual Cards Overlay */}
+      {virtualCardPositions.length > 0 && (
         <div className="virtual-cards-overlay">
           <svg className="virtual-arrows-svg">
             <defs>
@@ -1319,7 +1393,7 @@ const Canvas = observer(function Canvas() {
             </div>
           )}
         </div>
-      )} */}
+      )}
     </>
   );
 });

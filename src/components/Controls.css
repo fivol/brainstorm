@@ -71,8 +71,28 @@
   color: var(--error-color);
 }
 
-.control-btn-ai-configured {
-  color: var(--success-color);
+.control-btn-ai {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.ai-btn-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+}
+
+.control-btn-ai-configured .ai-btn-text {
+  background: linear-gradient(135deg, #34a853 0%, #0f9d58 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.control-btn-ai:hover:not(:disabled) {
+  background: rgba(102, 126, 234, 0.15);
 }
 
 .control-btn-ai-configured:hover:not(:disabled) {

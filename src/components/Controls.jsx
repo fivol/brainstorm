@@ -359,13 +359,11 @@ const Controls = observer(function Controls({ canvasRef }) {
         
         <div className="controls-group">
           <button 
-            className={`control-btn ${aiStore.isConfigured ? 'control-btn-ai-configured' : ''}`}
+            className={`control-btn control-btn-ai ${aiStore.isConfigured ? 'control-btn-ai-configured' : ''}`}
             onClick={() => aiStore.openModal()}
             data-tooltip="AI Settings"
           >
-            <svg viewBox="0 0 24 24" width="18" height="18">
-              <path fill="currentColor" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
-            </svg>
+            <span className="ai-btn-text">AI</span>
           </button>
           
           <button 

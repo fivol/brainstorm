@@ -159,18 +159,24 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--info-color);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   border: none;
   color: white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(26, 115, 232, 0.4);
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
   transition: all 0.15s ease;
   z-index: 100;
   transform: translate(-50%, -50%);
   animation: ai-icon-appear 0.2s ease-out;
+}
+
+.ai-icon-text {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
 }
 
 @keyframes ai-icon-appear {
