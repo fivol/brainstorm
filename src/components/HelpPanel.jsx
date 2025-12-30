@@ -18,6 +18,13 @@ const HelpPanel = observer(function HelpPanel() {
           <button className="help-close" onClick={() => uiStore.hideHelp()}>×</button>
         </div>
         
+        <div className="help-description">
+          <p>
+            <strong>BrainStorm</strong> — a visual tool for brainstorming and organizing ideas. 
+            Create nodes, connect them with edges, and build mind maps effortlessly.
+          </p>
+        </div>
+        
         <div className="help-content">
           <section className="help-section">
             <h3>Canvas Navigation</h3>
@@ -31,6 +38,7 @@ const HelpPanel = observer(function HelpPanel() {
             <h3>Node Creation</h3>
             <ul>
               <li><kbd>Click</kbd> empty space — Create new node</li>
+              <li><kbd>Tab</kbd> — Create new node at center</li>
               <li><kbd>Enter</kbd> (no selection) — Create node at center</li>
               <li><kbd>Ctrl/⌘ + Arrow</kbd> — Create connected node in direction</li>
             </ul>

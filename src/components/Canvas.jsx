@@ -530,6 +530,42 @@ const Canvas = observer(function Canvas() {
       return;
     }
     
+    // Tab - create new node
+    if (event.key === 'Tab') {
+      // Skip if in editable mode (allow normal tab behavior or text input)
+      if (activeNode?.state === NodeState.EDITABLE) {
+        event.preventDefault();
+        // Exit edit mode and create new node
+        const nodeText = activeNode.text?.trim() || '';
+        if (!nodeText) {
+          graphStore.deleteNode(activeNode.id, false);
+        } else {
+          uiStore.exitEditable(activeNode.id);
+          graphStore.recalculateNodeSize(activeNode.id);
+        }
+      }
+      
+      // Create new node in center of view
+      const { x, y, scale } = uiStore.view;
+      const centerX = (rendererRef.current.width / 2 - x) / scale;
+      const centerY = (rendererRef.current.height / 2 - y) / scale;
+      
+      const node = graphStore.createNode({ x: centerX, y: centerY, text: '' });
+      uiStore.setActiveNode(node.id);
+      uiStore.setEditableNode(node.id);
+      
+      if (simulationRef.current) {
+        simulationRef.current.update();
+        simulationRef.current.reheat(0.2);
+      }
+      
+      rendererRef.current.centerOnNode(node.id, false);
+      rendererRef.current.render();
+      setTimeout(() => focusNodeTextInput(node.id), 100);
+      event.preventDefault();
+      return;
+    }
+    
     // Enter - create node or enter edit mode
     if (event.key === 'Enter' && !event.shiftKey) {
       if (activeNode?.state === NodeState.EDITABLE) {

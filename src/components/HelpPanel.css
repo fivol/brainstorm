@@ -71,6 +71,23 @@
   opacity: 1;
 }
 
+.help-description {
+  padding: 16px 24px;
+  background: var(--bg-muted);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.help-description p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.help-description strong {
+  color: var(--text-color);
+}
+
 .help-content {
   padding: 20px 24px;
   overflow-y: auto;
