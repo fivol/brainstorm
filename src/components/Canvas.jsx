@@ -214,6 +214,15 @@ const Canvas = observer(function Canvas() {
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
     if (!activeNode) return;
     
+    // Hide suggestions when node enters editable mode
+    if (activeNode.state === NodeState.EDITABLE) {
+      if (aiStore.virtualCards.length > 0) {
+        aiStore.clearVirtualCards();
+        setSelectedVirtualCard(null);
+      }
+      return;
+    }
+    
     // Only show suggestions if:
     // - Node is active (not editable)
     // - Node has text content
@@ -232,15 +241,6 @@ const Canvas = observer(function Canvas() {
         .catch((err) => {
           console.error('Failed to generate AI suggestions:', err);
         });
-    } else {
-      // Clear suggestions when node enters editable mode or has no text
-      if (aiStore.virtualCards.length > 0 && aiStore.suggestionsForNodeId === uiStore.activeNodeId) {
-        // Don't clear if node just entered editable mode but suggestions are for this node
-        if (activeNode.state === NodeState.EDITABLE) {
-          aiStore.clearVirtualCards();
-          setSelectedVirtualCard(null);
-        }
-      }
     }
   }, [uiStore.activeNodeId, graphStore, aiStore]);
 
@@ -251,6 +251,11 @@ const Canvas = observer(function Canvas() {
     
     if (node.state === NodeState.ACTIVE) {
       // Second click on active node -> editable
+      // Clear AI suggestions when entering edit mode
+      if (aiStore.virtualCards.length > 0) {
+        aiStore.clearVirtualCards();
+        setSelectedVirtualCard(null);
+      }
       uiStore.setEditableNode(nodeId);
       // Focus the text input
       setTimeout(() => focusNodeTextInput(nodeId), 50);
@@ -578,24 +583,61 @@ const Canvas = observer(function Canvas() {
     
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
     
-    // Clear virtual cards on most actions (except navigation within them) - currently disabled
-    // const shouldClearVirtualCards = !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' '].includes(event.key);
-    // if (shouldClearVirtualCards && aiStore.virtualCards.length > 0 && !(event.ctrlKey && event.key === ' ')) {
-    //   aiStore.clearVirtualCards();
-    //   setSelectedVirtualCard(null);
-    // }
+    // Cmd+P - Open AI prompt input (when generateEnabled)
+    if ((event.metaKey || event.ctrlKey) && event.key === 'p') {
+      event.preventDefault();
+      if (aiStore.generateEnabled && activeNode && activeNode.state !== NodeState.EDITABLE) {
+        if (!aiStore.isConfigured) {
+          aiStore.openModal();
+          uiStore.info('Configure AI to use generate feature');
+          return;
+        }
+        handleAIIconClick();
+      }
+      return;
+    }
     
-    // Ctrl+Space - trigger AI suggestions (currently disabled)
+    // Handle virtual cards navigation with arrow keys
+    if (aiStore.virtualCards.length > 0 && activeNode && activeNode.state === NodeState.ACTIVE) {
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setSelectedVirtualCard(prev => 
+          prev === null || prev === 0 ? aiStore.virtualCards.length - 1 : prev - 1
+        );
+        return;
+      }
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setSelectedVirtualCard(prev => 
+          prev === null ? 0 : (prev + 1) % aiStore.virtualCards.length
+        );
+        return;
+      }
+      // Enter to accept selected virtual card
+      if (event.key === 'Enter' && selectedVirtualCard !== null) {
+        event.preventDefault();
+        handleVirtualCardClick(selectedVirtualCard);
+        return;
+      }
+      // Escape to close virtual cards
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        aiStore.clearVirtualCards();
+        setSelectedVirtualCard(null);
+        return;
+      }
+    }
+    
+    // Ctrl+Space - trigger AI suggestions
     if ((event.ctrlKey || event.metaKey) && event.key === ' ') {
       event.preventDefault();
-      // Virtual cards feature is currently disabled
-      // if (activeNode && activeNode.state !== NodeState.EDITABLE && aiStore.isConfigured) {
-      //   aiStore.generateSuggestions(graphStore, activeNode.id, 3);
-      //   setSelectedVirtualCard(0);
-      // } else if (!aiStore.isConfigured) {
-      //   aiStore.openModal();
-      //   uiStore.info('Configure AI to get suggestions');
-      // }
+      if (activeNode && activeNode.state !== NodeState.EDITABLE && aiStore.isConfigured && aiStore.hintsEnabled) {
+        aiStore.generateSuggestions(graphStore, activeNode.id, 3);
+        setSelectedVirtualCard(0);
+      } else if (!aiStore.isConfigured) {
+        aiStore.openModal();
+        uiStore.info('Configure AI to get suggestions');
+      }
       return;
     }
     
@@ -1032,23 +1074,15 @@ const Canvas = observer(function Canvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // Calculate AI icon position for active node
+  // Fixed position for AI button when node is selected
   const getAIIconPosition = useCallback(() => {
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
     if (!activeNode || activeNode.state === NodeState.EDITABLE) return null;
     
-    const { x: viewX, y: viewY, scale } = uiStore.view;
-    
-    // Position at top-right of node
-    const canvasX = activeNode.x + activeNode.w / 2 + 10;
-    const canvasY = activeNode.y - activeNode.h / 2 - 10;
-    
-    // Convert to screen coordinates
-    const screenX = canvasX * scale + viewX;
-    const screenY = canvasY * scale + viewY;
-    
-    return { x: screenX, y: screenY };
-  }, [graphStore, uiStore.activeNodeId, uiStore.view]);
+    // Fixed position in viewport - bottom right area near the node
+    // This keeps the button stable and doesn't move across nodes
+    return { x: 60, y: window.innerHeight - 120 };
+  }, [graphStore, uiStore.activeNodeId]);
 
   // Handle AI icon click
   const handleAIIconClick = useCallback(() => {
@@ -1222,7 +1256,7 @@ const Canvas = observer(function Canvas() {
     rendererRef.current.render();
   }, [graphStore, uiStore, aiStore]);
 
-  // Calculate virtual card positions
+  // Calculate virtual card positions - fixed position to avoid overlaps
   const getVirtualCardPositions = useCallback(() => {
     if (aiStore.virtualCards.length === 0) return [];
     
@@ -1230,33 +1264,36 @@ const Canvas = observer(function Canvas() {
     if (!activeNode) return [];
     
     const { x: viewX, y: viewY, scale } = uiStore.view;
-    const cardWidth = 160;
-    const cardHeight = 44;
-    const gap = 20;
-    const offset = 80;
+    const cardWidth = 180;
+    const cardHeight = 48;
+    const gap = 12;
+    
+    // Fixed position: right side of screen, centered vertically
+    const baseX = window.innerWidth - cardWidth - 40;
+    const totalHeight = aiStore.virtualCards.length * cardHeight + (aiStore.virtualCards.length - 1) * gap;
+    const baseY = (window.innerHeight - totalHeight) / 2;
+    
+    // Get node screen position for arrow
+    const nodeScreenX = (activeNode.x + activeNode.w / 2) * scale + viewX;
+    const nodeScreenY = activeNode.y * scale + viewY;
     
     return aiStore.virtualCards.map((card, index) => {
-      // Position to the right of the active node
-      const canvasX = activeNode.x + activeNode.w + offset;
-      const canvasY = activeNode.y + (index * (cardHeight + gap));
-      
-      // Convert to screen coordinates
-      const screenX = canvasX * scale + viewX;
-      const screenY = canvasY * scale + viewY;
+      const screenX = baseX;
+      const screenY = baseY + index * (cardHeight + gap);
       
       return {
         ...card,
         index,
         x: screenX,
         y: screenY,
-        width: cardWidth * scale,
-        height: cardHeight * scale,
+        width: cardWidth,
+        height: cardHeight,
         // Arrow start point (from active node)
-        arrowStartX: (activeNode.x + activeNode.w) * scale + viewX,
-        arrowStartY: (activeNode.y + activeNode.h / 2) * scale + viewY,
+        arrowStartX: Math.min(nodeScreenX + 80, screenX - 20),
+        arrowStartY: nodeScreenY,
         // Arrow end point (to virtual card)
         arrowEndX: screenX,
-        arrowEndY: screenY + (cardHeight * scale) / 2
+        arrowEndY: screenY + cardHeight / 2
       };
     });
   }, [graphStore, uiStore, aiStore.virtualCards]);
@@ -1275,7 +1312,7 @@ const Canvas = observer(function Canvas() {
         onMouseLeave={handleCanvasMouseUp}
       />
       
-      {/* AI Generate Icon */}
+      {/* AI Generate Icon - Conversation style, fixed position */}
       {aiIconPosition && aiStore.generateEnabled && aiStore.isConfigured && !showAIInput && (
         <button
           className="ai-generate-icon"
@@ -1284,9 +1321,11 @@ const Canvas = observer(function Canvas() {
             top: aiIconPosition.y,
           }}
           onClick={handleAIIconClick}
-          title="Generate nodes with AI"
+          title="Generate nodes with AI (⌘P)"
         >
-          <span className="ai-icon-text">AI</span>
+          <svg viewBox="0 0 24 24" width="14" height="14">
+            <path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/>
+          </svg>
         </button>
       )}
       

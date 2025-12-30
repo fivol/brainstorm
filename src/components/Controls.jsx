@@ -10,6 +10,7 @@ const Controls = observer(function Controls({ canvasRef }) {
   const { graphStore, uiStore, undoStore, aiStore } = useStores();
   const fileInputRef = useRef(null);
   const [showRecent, setShowRecent] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [recentDocs, setRecentDocs] = useState(() => {
     try {
       const saved = localStorage.getItem('brainstorm-recent');
@@ -359,11 +360,13 @@ const Controls = observer(function Controls({ canvasRef }) {
         
         <div className="controls-group">
           <button 
-            className={`control-btn control-btn-ai ${aiStore.isConfigured ? 'control-btn-ai-configured' : ''}`}
-            onClick={() => aiStore.openModal()}
-            data-tooltip="AI Settings"
+            className={`control-btn ${showSettings ? 'control-btn-active' : ''}`}
+            onClick={() => setShowSettings(!showSettings)}
+            data-tooltip="Settings"
           >
-            <span className="ai-btn-text">AI</span>
+            <svg viewBox="0 0 24 24" width="18" height="18">
+              <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+            </svg>
           </button>
           
           <button 
@@ -377,6 +380,63 @@ const Controls = observer(function Controls({ canvasRef }) {
           </button>
         </div>
       </div>
+      
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="settings-panel">
+          <div className="settings-header">
+            <h3>Settings</h3>
+            <button className="settings-close" onClick={() => setShowSettings(false)}>×</button>
+          </div>
+          <div className="settings-content">
+            {/* AI Section */}
+            <div className="settings-section">
+              <div className="settings-section-header">
+                <svg viewBox="0 0 24 24" width="16" height="16">
+                  <path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/>
+                </svg>
+                <span>AI Assistant</span>
+              </div>
+              
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={aiStore.hintsEnabled}
+                  onChange={() => aiStore.setHintsEnabled(!aiStore.hintsEnabled)}
+                />
+                <span className="settings-toggle-slider"></span>
+                <div className="settings-toggle-content">
+                  <span className="settings-toggle-title">AI Hints</span>
+                  <span className="settings-toggle-desc">Auto-suggest ideas (Ctrl+Space)</span>
+                </div>
+              </label>
+              
+              <label className="settings-toggle">
+                <input
+                  type="checkbox"
+                  checked={aiStore.generateEnabled}
+                  onChange={() => aiStore.setGenerateEnabled(!aiStore.generateEnabled)}
+                />
+                <span className="settings-toggle-slider"></span>
+                <div className="settings-toggle-content">
+                  <span className="settings-toggle-title">AI Generate</span>
+                  <span className="settings-toggle-desc">Generate nodes from prompts (⌘P)</span>
+                </div>
+              </label>
+              
+              <button 
+                className={`settings-btn ${aiStore.isConfigured ? 'settings-btn-configured' : ''}`}
+                onClick={() => { aiStore.openModal(); setShowSettings(false); }}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16">
+                  <path fill="currentColor" d="M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z"/>
+                </svg>
+                {aiStore.isConfigured ? 'API Key Configured' : 'Configure API Key'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Recent Documents Panel */}
       {showRecent && (

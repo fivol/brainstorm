@@ -350,6 +350,7 @@ Respond with ONLY a JSON array of ${numSuggestions} strings, no explanation. Exa
       let suggestions = [];
 
       if (this.provider === LLMProviders.OPENAI) {
+        // Use structured outputs for reliable JSON responses
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -363,14 +364,34 @@ Respond with ONLY a JSON array of ${numSuggestions} strings, no explanation. Exa
               { role: 'user', content: prompt }
             ],
             max_tokens: 200,
-            temperature: 0.8
+            temperature: 0.8,
+            response_format: {
+              type: 'json_schema',
+              json_schema: {
+                name: 'suggestions',
+                strict: true,
+                schema: {
+                  type: 'object',
+                  properties: {
+                    suggestions: {
+                      type: 'array',
+                      items: { type: 'string' },
+                      description: 'Array of suggestion strings'
+                    }
+                  },
+                  required: ['suggestions'],
+                  additionalProperties: false
+                }
+              }
+            }
           })
         });
 
         if (response.ok) {
           const data = await response.json();
-          const content = data.choices?.[0]?.message?.content || '[]';
-          suggestions = JSON.parse(content);
+          const content = data.choices?.[0]?.message?.content || '{"suggestions":[]}';
+          const parsed = JSON.parse(content);
+          suggestions = parsed.suggestions || [];
         }
       } else if (this.provider === LLMProviders.ANTHROPIC) {
         const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -500,6 +521,7 @@ Rules:
       let result = null;
 
       if (this.provider === LLMProviders.OPENAI) {
+        // Use structured outputs for reliable JSON responses
         const response = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -513,13 +535,51 @@ Rules:
               { role: 'user', content: `Task: ${task}` }
             ],
             max_tokens: 1000,
-            temperature: 0.7
+            temperature: 0.7,
+            response_format: {
+              type: 'json_schema',
+              json_schema: {
+                name: 'graph_generation',
+                strict: true,
+                schema: {
+                  type: 'object',
+                  properties: {
+                    nodes: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          text: { type: 'string' }
+                        },
+                        required: ['id', 'text'],
+                        additionalProperties: false
+                      }
+                    },
+                    edges: {
+                      type: 'array',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          from: { type: 'string' },
+                          to: { type: 'string' }
+                        },
+                        required: ['from', 'to'],
+                        additionalProperties: false
+                      }
+                    }
+                  },
+                  required: ['nodes', 'edges'],
+                  additionalProperties: false
+                }
+              }
+            }
           })
         });
 
         if (response.ok) {
           const data = await response.json();
-          const content = data.choices?.[0]?.message?.content || '{}';
+          const content = data.choices?.[0]?.message?.content || '{"nodes":[],"edges":[]}';
           result = JSON.parse(content);
         }
       } else if (this.provider === LLMProviders.ANTHROPIC) {
