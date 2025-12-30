@@ -1,8 +1,7 @@
 import * as d3 from 'd3';
-import { observer } from 'mobx-react-lite';
 import { NodeState } from '../types';
 import { generateEdgePath, getEdgeMidpoint, createArrowMarker } from './EdgeRenderer';
-import { measureText, truncateText } from '../utils/text';
+import { truncateText } from '../utils/text';
 
 /**
  * D3-based canvas renderer.
@@ -356,7 +355,6 @@ export class CanvasRenderer {
       
       // Calculate line count to determine overflow behavior
       // Line height is 20px (14px * 1.4 = ~20px), max 3 lines = 60px text height
-      const textContent = d.text || '';
       const lineHeight = 20;
       const maxLinesWithoutScroll = 3;
       const maxTextHeight = maxLinesWithoutScroll * lineHeight;
