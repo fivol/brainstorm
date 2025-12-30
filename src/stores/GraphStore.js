@@ -230,8 +230,22 @@ class GraphStore {
     const node = this.nodes.get(nodeId);
     if (!node) return;
     
+    const prevState = node.state;
     node.state = state;
-    this.recalculateNodeSize(nodeId);
+    
+    // Only recalculate size when exiting EDITABLE mode (to finalize size after editing)
+    // or when text is very long and needs height adjustment for truncation
+    const wasEditable = prevState === NodeState.EDITABLE;
+    const isExpanded = state === NodeState.ACTIVE || state === NodeState.EDITABLE;
+    
+    // Recalculate when exiting editable mode to finalize the size
+    if (wasEditable && !isExpanded) {
+      this.recalculateNodeSize(nodeId);
+    }
+    // Or when entering expanded mode with long text (for proper height)
+    else if (isExpanded && node.text?.length > 50) {
+      this.recalculateNodeSize(nodeId);
+    }
   }
 
   /**
@@ -244,6 +258,14 @@ class GraphStore {
     if (!node) return;
     
     const isExpanded = node.state === NodeState.ACTIVE || node.state === NodeState.EDITABLE;
+    
+    // If text is empty, use default size
+    const text = node.text?.trim() || '';
+    if (!text) {
+      node.w = GraphStore.DEFAULT_NODE_WIDTH;
+      node.h = GraphStore.DEFAULT_NODE_HEIGHT;
+      return;
+    }
     
     // Always use MAX_NODE_WIDTH as the limit - nodes grow horizontally to this width,
     // then grow vertically. This ensures ~6 words per line.

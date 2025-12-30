@@ -37,7 +37,8 @@
   border-radius: 8px;
   color: var(--text-color);
   cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
+  transition: background 0.15s, opacity 0.15s, color 0.15s;
+  position: relative;
 }
 
 .control-btn:hover:not(:disabled) {
@@ -53,10 +54,225 @@
   cursor: not-allowed;
 }
 
+.control-btn-primary {
+  color: var(--info-color);
+}
+
+.control-btn-primary:hover:not(:disabled) {
+  background: rgba(26, 115, 232, 0.15);
+}
+
+.control-btn-active {
+  background: var(--hover-bg);
+  color: var(--info-color);
+}
+
 .control-btn-danger:hover:not(:disabled) {
   color: var(--error-color);
 }
 
 .control-btn svg {
   flex-shrink: 0;
+}
+
+/* Tooltips */
+.control-btn[data-tooltip]:hover::after,
+.recent-item-delete[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  background: var(--bg-color);
+  color: var(--text-color);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
+  pointer-events: none;
+  z-index: 1000;
+  animation: tooltip-fade-in 0.15s ease-out;
+}
+
+.control-btn[data-tooltip]:hover::before,
+.recent-item-delete[data-tooltip]:hover::before {
+  content: '';
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--border-color);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+@keyframes tooltip-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* Recent Panel */
+.recent-panel {
+  position: fixed;
+  bottom: 80px;
+  left: 20px;
+  width: 280px;
+  max-height: 400px;
+  background: var(--panel-bg);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-color);
+  z-index: 99;
+  overflow: hidden;
+  animation: panel-slide-up 0.2s ease-out;
+}
+
+@keyframes panel-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.recent-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.recent-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.recent-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.recent-close:hover {
+  background: var(--hover-bg);
+  color: var(--text-color);
+}
+
+.recent-list {
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.recent-empty {
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.recent-empty p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.recent-empty-hint {
+  margin-top: 8px !important;
+  font-size: 12px !important;
+  opacity: 0.7;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.recent-item:last-child {
+  border-bottom: none;
+}
+
+.recent-item:hover {
+  background: var(--hover-bg);
+}
+
+.recent-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.recent-item-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-color);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-item-meta {
+  display: flex;
+  gap: 8px;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.recent-item-count {
+  color: var(--info-color);
+}
+
+.recent-item-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  opacity: 0;
+  position: relative;
+}
+
+.recent-item:hover .recent-item-delete {
+  opacity: 1;
+}
+
+.recent-item-delete:hover {
+  background: rgba(217, 48, 37, 0.1);
+  color: var(--error-color);
 }

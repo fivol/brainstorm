@@ -4,7 +4,7 @@ import { useStores } from '../stores';
 import { CanvasRenderer } from '../canvas/CanvasRenderer';
 import { ForceSimulation } from '../canvas/ForceSimulation';
 import { NodeState } from '../types';
-import { pointInRect } from '../utils/geometry';
+import { pointInRect, findFreePosition } from '../utils/geometry';
 import './Canvas.css';
 
 /**
@@ -102,8 +102,38 @@ const Canvas = observer(function Canvas() {
     };
     window.addEventListener('brainstorm:center-node', handleCenterNode);
     
-    // Handle first visit complete - create first node
+    // Handle create new node event (from plus button)
+    const handleCreateNewNode = () => {
+      // Create new node in center of view, finding free space
+      const { x, y, scale } = uiStore.view;
+      const centerX = (renderer.width / 2 - x) / scale;
+      const centerY = (renderer.height / 2 - y) / scale;
+      
+      // Find a free position near the center
+      const existingNodes = graphStore.getNodes();
+      const freePos = findFreePosition(existingNodes, centerX, centerY, 160, 44);
+      
+      const node = graphStore.createNode({ x: freePos.x, y: freePos.y, text: '' });
+      uiStore.setActiveNode(node.id);
+      uiStore.setEditableNode(node.id);
+      
+      simulation.update();
+      simulation.reheat(0.2);
+      
+      renderer.centerOnNode(node.id, false);
+      renderer.render();
+      setTimeout(() => focusNodeTextInput(node.id), 100);
+    };
+    window.addEventListener('brainstorm:create-node', handleCreateNewNode);
+    
+    // Handle first visit complete - create first node only if no nodes exist
     const handleFirstVisitComplete = () => {
+      // If there are already nodes (e.g., from loaded example), don't create new one
+      if (graphStore.nodes.size > 0) {
+        renderer.fitView();
+        return;
+      }
+      
       // Create first node at canvas origin (0, 0) - this will be centered
       // Using 0,0 ensures the node is at the logical center regardless of view state
       const node = graphStore.createNode({ x: 0, y: 0, text: '' });
@@ -133,6 +163,7 @@ const Canvas = observer(function Canvas() {
       window.removeEventListener('brainstorm:focus-node', handleFocusNode);
       window.removeEventListener('brainstorm:update-simulation', handleUpdateSimulation);
       window.removeEventListener('brainstorm:center-node', handleCenterNode);
+      window.removeEventListener('brainstorm:create-node', handleCreateNewNode);
       window.removeEventListener('brainstorm:first-visit-complete', handleFirstVisitComplete);
       simulation.dispose();
       renderer.dispose();
@@ -591,12 +622,16 @@ const Canvas = observer(function Canvas() {
         }
       }
       
-      // Create new node in center of view
+      // Create new node in center of view, finding free space
       const { x, y, scale } = uiStore.view;
       const centerX = (rendererRef.current.width / 2 - x) / scale;
       const centerY = (rendererRef.current.height / 2 - y) / scale;
       
-      const node = graphStore.createNode({ x: centerX, y: centerY, text: '' });
+      // Find a free position near the center
+      const existingNodes = graphStore.getNodes();
+      const freePos = findFreePosition(existingNodes, centerX, centerY, 160, 44);
+      
+      const node = graphStore.createNode({ x: freePos.x, y: freePos.y, text: '' });
       uiStore.setActiveNode(node.id);
       uiStore.setEditableNode(node.id);
       
@@ -650,12 +685,16 @@ const Canvas = observer(function Canvas() {
           return;
         }
         
-        // Create new node in center of view
+        // Create new node in center of view, finding free space
         const { x, y, scale } = uiStore.view;
         const centerX = (rendererRef.current.width / 2 - x) / scale;
         const centerY = (rendererRef.current.height / 2 - y) / scale;
         
-        const node = graphStore.createNode({ x: centerX, y: centerY, text: '' });
+        // Find a free position near the center
+        const existingNodes = graphStore.getNodes();
+        const freePos = findFreePosition(existingNodes, centerX, centerY, 160, 44);
+        
+        const node = graphStore.createNode({ x: freePos.x, y: freePos.y, text: '' });
         uiStore.setActiveNode(node.id);
         uiStore.setEditableNode(node.id);
         

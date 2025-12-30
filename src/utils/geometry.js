@@ -179,3 +179,78 @@ export function clamp(value, min, max) {
 export function lerp(a, b, t) {
   return a + (b - a) * t;
 }
+
+/**
+ * Find a convenient free position for a new node.
+ * Tries to place the node in free space near the target position,
+ * preferring positions closer to the center of the view.
+ * @param {Array<{x: number, y: number, w: number, h: number}>} nodes - Existing nodes
+ * @param {number} targetX - Target X position (center of view or click position)
+ * @param {number} targetY - Target Y position
+ * @param {number} nodeW - Width of new node
+ * @param {number} nodeH - Height of new node
+ * @param {number} [minSpacing=30] - Minimum spacing between nodes
+ * @returns {{x: number, y: number}}
+ */
+export function findFreePosition(nodes, targetX, targetY, nodeW, nodeH, minSpacing = 30) {
+  // If no nodes, return target position
+  if (nodes.length === 0) {
+    return { x: targetX, y: targetY };
+  }
+  
+  // Check if target position is free
+  const testRect = { x: targetX, y: targetY, w: nodeW + minSpacing, h: nodeH + minSpacing };
+  let isFree = true;
+  for (const node of nodes) {
+    const nodeRect = { x: node.x, y: node.y, w: node.w + minSpacing, h: node.h + minSpacing };
+    if (rectsIntersect(testRect, nodeRect)) {
+      isFree = false;
+      break;
+    }
+  }
+  
+  if (isFree) {
+    return { x: targetX, y: targetY };
+  }
+  
+  // Try positions in a spiral pattern around target
+  const spiralStep = 50;
+  const maxRadius = 500;
+  let bestPos = { x: targetX, y: targetY };
+  let bestDist = Infinity;
+  
+  for (let radius = spiralStep; radius <= maxRadius; radius += spiralStep) {
+    // Try 8 positions at each radius
+    for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 4) {
+      const testX = targetX + Math.cos(angle) * radius;
+      const testY = targetY + Math.sin(angle) * radius;
+      
+      const rect = { x: testX, y: testY, w: nodeW + minSpacing, h: nodeH + minSpacing };
+      let overlaps = false;
+      
+      for (const node of nodes) {
+        const nodeRect = { x: node.x, y: node.y, w: node.w + minSpacing, h: node.h + minSpacing };
+        if (rectsIntersect(rect, nodeRect)) {
+          overlaps = true;
+          break;
+        }
+      }
+      
+      if (!overlaps) {
+        const dist = distance(testX, testY, targetX, targetY);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestPos = { x: testX, y: testY };
+        }
+      }
+    }
+    
+    // If we found a position, return it
+    if (bestDist < Infinity) {
+      return bestPos;
+    }
+  }
+  
+  // Fallback: offset from target
+  return { x: targetX + 200, y: targetY };
+}
