@@ -23,6 +23,10 @@ export class ForceSimulation {
   // Track focused node for selective strengthening
   focusedNodeId = null;
   
+  // Timeout for fixing positions after time limit
+  settleTimeout = null;
+  settleTimeLimit = 1000;      // 1 second time limit for arrangement
+  
   constructor(graphStore, uiStore = null, options = {}) {
     this.graphStore = graphStore;
     this.uiStore = uiStore;
@@ -63,9 +67,9 @@ export class ForceSimulation {
       .force('x', d3.forceX(0).strength(0.02))
       .force('y', d3.forceY(0).strength(0.02))
       
-      // Simulation parameters for smooth animation
-      .alphaDecay(0.02)      // Slower decay for smoother settling
-      .velocityDecay(0.4);   // Medium friction for natural movement
+      // Simulation parameters for fast settling
+      .alphaDecay(0.05)      // Faster decay for quicker settling
+      .velocityDecay(0.5);   // Higher friction for faster stabilization
     
     this.simulation.on('tick', () => {
       this.syncToStore();
@@ -177,11 +181,23 @@ export class ForceSimulation {
 
   /**
    * Trigger a gentle layout adaptation.
+   * Positions will be fixed after settleTimeLimit (1s).
    * @param {number} [alpha=0.3] - Heat level (0-1)
    */
   reheat(alpha = 0.3) {
     this.update();
     this.simulation.alpha(alpha).restart();
+    
+    // Clear any existing timeout
+    if (this.settleTimeout) {
+      clearTimeout(this.settleTimeout);
+    }
+    
+    // Set timeout to stop simulation and fix positions after 1s
+    this.settleTimeout = setTimeout(() => {
+      this.simulation.stop();
+      this.settleTimeout = null;
+    }, this.settleTimeLimit);
   }
 
   /**
@@ -220,17 +236,31 @@ export class ForceSimulation {
    * @param {string} nodeId
    */
   startDrag(nodeId) {
+    // Clear settle timeout during drag
+    if (this.settleTimeout) {
+      clearTimeout(this.settleTimeout);
+      this.settleTimeout = null;
+    }
     // Heat up simulation for responsive collision
     this.simulation.alphaTarget(0.3).restart();
   }
 
   /**
    * End drag interaction.
-   * Allows simulation to cool down naturally.
+   * Allows simulation to cool down naturally with time limit.
    */
   endDrag() {
     // Let simulation cool down naturally
     this.simulation.alphaTarget(0);
+    
+    // Set timeout to stop simulation after settling
+    if (this.settleTimeout) {
+      clearTimeout(this.settleTimeout);
+    }
+    this.settleTimeout = setTimeout(() => {
+      this.simulation.stop();
+      this.settleTimeout = null;
+    }, this.settleTimeLimit);
   }
 
   /**
@@ -299,6 +329,10 @@ export class ForceSimulation {
    * Dispose simulation.
    */
   dispose() {
+    if (this.settleTimeout) {
+      clearTimeout(this.settleTimeout);
+      this.settleTimeout = null;
+    }
     this.simulation.stop();
     this.simulation = null;
   }

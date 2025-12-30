@@ -16,10 +16,12 @@ const Canvas = observer(function Canvas() {
   const svgRef = useRef(null);
   const rendererRef = useRef(null);
   const simulationRef = useRef(null);
-  const textInputRef = useRef(null);
   
   // Track drag state for distinguishing click vs drag
   const dragStateRef = useRef({ isDragging: false, startX: 0, startY: 0 });
+  
+  // Track if we just finished a rect selection (to prevent creating node on mouseup)
+  const justFinishedRectSelection = useRef(false);
 
   // Initialize renderer and simulation
   useEffect(() => {
@@ -83,7 +85,7 @@ const Canvas = observer(function Canvas() {
   ]);
 
   // Handle node click
-  const handleNodeClick = useCallback((nodeId, event) => {
+  const handleNodeClick = useCallback((nodeId, _event) => {
     const node = graphStore.getNode(nodeId);
     if (!node) return;
     
@@ -111,7 +113,7 @@ const Canvas = observer(function Canvas() {
   }, [graphStore, uiStore]);
 
   // Handle node double click
-  const handleNodeDoubleClick = useCallback((nodeId, event) => {
+  const handleNodeDoubleClick = useCallback((nodeId, _event) => {
     uiStore.setActiveNode(nodeId);
     uiStore.setEditableNode(nodeId);
     setTimeout(() => focusNodeTextInput(nodeId), 50);
@@ -146,9 +148,12 @@ const Canvas = observer(function Canvas() {
       startY: node.y
     };
     
-    // If starting edge creation from active node (Alt/Option + drag)
-    if (node.state === NodeState.ACTIVE && event.sourceEvent?.altKey) {
+    // If dragging from an active node, start edge creation (per spec: drag from active node creates edge)
+    if (node.state === NodeState.ACTIVE) {
       uiStore.startEdgeCreation(nodeId);
+      // Initialize cursor position
+      const pos = rendererRef.current.screenToCanvas(event.sourceEvent.clientX, event.sourceEvent.clientY);
+      uiStore.updateEdgeCreation(pos.x, pos.y);
       return;
     }
     
@@ -172,7 +177,7 @@ const Canvas = observer(function Canvas() {
     const node = graphStore.getNode(nodeId);
     if (!node) return;
     
-    const { x, y, scale } = uiStore.view;
+    const { scale } = uiStore.view;
     const newX = node.x + event.dx / scale;
     const newY = node.y + event.dy / scale;
     
@@ -249,12 +254,18 @@ const Canvas = observer(function Canvas() {
   };
 
   // Handle edge click
-  const handleEdgeClick = useCallback((edgeId, event) => {
+  const handleEdgeClick = useCallback((edgeId, _event) => {
     uiStore.setSelectedEdge(edgeId);
   }, [uiStore]);
 
   // Handle canvas click (empty space)
   const handleCanvasClick = useCallback((event) => {
+    // Skip if we just finished a rect selection
+    if (justFinishedRectSelection.current) {
+      justFinishedRectSelection.current = false;
+      return;
+    }
+    
     // Check if click is on canvas background (not on nodes/edges)
     const target = event.target;
     const isBackground = target.classList.contains('canvas-background') || 
@@ -334,6 +345,8 @@ const Canvas = observer(function Canvas() {
 
   const handleCanvasMouseUp = useCallback((event) => {
     if (dragStateRef.current.isRectSelect) {
+      // Mark that we just finished a rect selection to prevent click from creating a node
+      justFinishedRectSelection.current = true;
       uiStore.endRectSelection();
       dragStateRef.current.isRectSelect = false;
       rendererRef.current.render();
@@ -378,11 +391,25 @@ const Canvas = observer(function Canvas() {
       return;
     }
     
-    // Escape - exit editable or clear selection
+    // Escape - close help, exit editable, or clear selection
     if (event.key === 'Escape') {
+      // First priority: close help panel if open
+      if (uiStore.helpVisible) {
+        uiStore.hideHelp();
+        return;
+      }
+      
       if (activeNode?.state === NodeState.EDITABLE) {
-        uiStore.exitEditable(activeNode.id);
-        graphStore.recalculateNodeSize(activeNode.id);
+        // Remove node if text is empty
+        const nodeText = activeNode.text?.trim() || '';
+        if (!nodeText) {
+          graphStore.deleteNode(activeNode.id, false);
+          uiStore.clearSelection();
+          uiStore.info('Empty node removed');
+        } else {
+          uiStore.exitEditable(activeNode.id);
+          graphStore.recalculateNodeSize(activeNode.id);
+        }
         if (simulationRef.current) {
           simulationRef.current.update();
           simulationRef.current.reheat(0.1);
@@ -397,9 +424,16 @@ const Canvas = observer(function Canvas() {
     // Enter - create node or enter edit mode
     if (event.key === 'Enter' && !event.shiftKey) {
       if (activeNode?.state === NodeState.EDITABLE) {
-        // Exit edit mode
-        uiStore.exitEditable(activeNode.id);
-        graphStore.recalculateNodeSize(activeNode.id);
+        // Remove node if text is empty, otherwise exit edit mode
+        const nodeText = activeNode.text?.trim() || '';
+        if (!nodeText) {
+          graphStore.deleteNode(activeNode.id, false);
+          uiStore.clearSelection();
+          uiStore.info('Empty node removed');
+        } else {
+          uiStore.exitEditable(activeNode.id);
+          graphStore.recalculateNodeSize(activeNode.id);
+        }
         if (simulationRef.current) {
           simulationRef.current.update();
           simulationRef.current.reheat(0.1);
