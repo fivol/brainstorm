@@ -321,6 +321,8 @@ export class CanvasRenderer {
       const isMultiSelected = d.state === NodeState.MULTI_SELECTED;
       const isExpanded = isActive || isEditable;
       
+      // Set data-node-id for focusNodeTextInput to find the node
+      g.attr('data-node-id', d.id);
       g.attr('transform', `translate(${d.x - d.w / 2}, ${d.y - d.h / 2})`);
       
       // Background rect

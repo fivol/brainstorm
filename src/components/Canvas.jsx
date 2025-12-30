@@ -201,6 +201,7 @@ const Canvas = observer(function Canvas() {
       
       // Find target node
       const targetNode = findNodeAtPosition(pos.x, pos.y);
+      let newNodeId = null;
       
       if (targetNode && targetNode.id !== uiStore.edgeCreation.sourceId) {
         // Create edge to existing node
@@ -212,7 +213,7 @@ const Canvas = observer(function Canvas() {
         graphStore.createEdge(uiStore.edgeCreation.sourceId, newNode.id);
         uiStore.setActiveNode(newNode.id);
         uiStore.setEditableNode(newNode.id);
-        setTimeout(() => focusNodeTextInput(newNode.id), 50);
+        newNodeId = newNode.id;
       }
       
       uiStore.cancelEdgeCreation();
@@ -220,6 +221,12 @@ const Canvas = observer(function Canvas() {
       if (simulationRef.current) {
         simulationRef.current.update();
         simulationRef.current.reheat(0.3);
+      }
+      
+      // If a new node was created, render and focus it
+      if (newNodeId) {
+        rendererRef.current.render();
+        setTimeout(() => focusNodeTextInput(newNodeId), 100);
       }
       return;
     }
@@ -290,7 +297,9 @@ const Canvas = observer(function Canvas() {
       simulationRef.current.reheat(0.2);
     }
     
-    setTimeout(() => focusNodeTextInput(node.id), 50);
+    // Render immediately to create the DOM element, then focus
+    rendererRef.current.render();
+    setTimeout(() => focusNodeTextInput(node.id), 100);
     uiStore.info('Node created');
   }, [graphStore, uiStore]);
 
@@ -486,7 +495,9 @@ const Canvas = observer(function Canvas() {
           simulationRef.current.reheat(0.2);
         }
         
-        setTimeout(() => focusNodeTextInput(node.id), 50);
+        // Render immediately to create the DOM element, then focus
+        rendererRef.current.render();
+        setTimeout(() => focusNodeTextInput(node.id), 100);
         event.preventDefault();
       }
       return;
@@ -553,7 +564,9 @@ const Canvas = observer(function Canvas() {
         simulationRef.current.reheat(0.3);
       }
       
-      setTimeout(() => focusNodeTextInput(newNode.id), 50);
+      // Render immediately to create the DOM element, then focus
+      rendererRef.current.render();
+      setTimeout(() => focusNodeTextInput(newNode.id), 100);
       event.preventDefault();
     }
   }, [graphStore, uiStore, undoStore]);
