@@ -1,30 +1,25 @@
+/* Help Panel - Uses shared modal-overlay styles from App.css */
 .help-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  animation: fade-in 0.2s ease;
+  animation: fade-in var(--transition-normal);
 }
 
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
+/* fade-in animation is defined in App.css */
 
 .help-panel {
   background: var(--panel-bg);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
   max-width: 600px;
   max-height: 80vh;
   overflow: hidden;
-  animation: slide-up 0.2s ease;
+  animation: slide-up var(--transition-normal);
 }
 
 .help-scrollable {
@@ -32,16 +27,7 @@
   max-height: 80vh;
 }
 
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* slide-up animation is defined in App.css */
 
 .help-header {
   display: flex;
@@ -57,6 +43,7 @@
   color: var(--text-color);
 }
 
+/* Uses shared close-btn styles from App.css */
 .help-close {
   background: none;
   border: none;
@@ -66,7 +53,7 @@
   padding: 0;
   line-height: 1;
   opacity: 0.6;
-  transition: opacity 0.15s;
+  transition: opacity var(--transition-fast);
 }
 
 .help-close:hover {
@@ -156,9 +143,9 @@ kbd {
   color: #e2e2f0;
   background: linear-gradient(135deg, #6366f1, #8b5cf6);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-normal);
   box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
 }
 
@@ -200,9 +187,9 @@ kbd {
   padding: 12px 8px;
   background: var(--bg-muted);
   border: 1px solid var(--border-color);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .help-example-btn:hover {
@@ -224,4 +211,60 @@ kbd {
 .help-example-desc {
   font-size: 11px;
   color: var(--text-muted);
+}
+
+/* AI Section */
+.help-section-ai {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.05), rgba(118, 75, 162, 0.05));
+  border: 1px solid rgba(102, 126, 234, 0.15);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.help-ai-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 12px 0;
+  line-height: 1.5;
+}
+
+.help-ai-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.help-ai-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--error-color);
+}
+
+.help-ai-indicator.configured {
+  background: var(--success-color);
+}
+
+.help-ai-configure-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 16px;
+  background: var(--ai-gradient);
+  border: none;
+  border-radius: var(--radius-md);
+  color: white;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.help-ai-configure-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }

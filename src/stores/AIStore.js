@@ -460,13 +460,13 @@ Respond with ONLY a JSON array of ${numSuggestions} strings, no explanation. Exa
   /**
    * Generate new nodes and edges based on a task
    * @param {Object} graphStore - Graph store
-   * @param {string} nodeId - Source node ID
+   * @param {string|null} nodeId - Source node ID (optional, can generate without selection)
    * @param {string} task - Task description from user
    */
   async generateFromTask(graphStore, nodeId, task) {
-    const node = graphStore.getNode(nodeId);
-    if (!node || !this.isConfigured || !task.trim()) return null;
+    if (!this.isConfigured || !task.trim()) return null;
 
+    const node = nodeId ? graphStore.getNode(nodeId) : null;
     this.generateLoading = true;
 
     try {
@@ -486,14 +486,25 @@ Respond with ONLY a JSON array of ${numSuggestions} strings, no explanation. Exa
         }))
       };
 
-      const currentNodeShortId = nodeId.slice(-6);
+      const currentNodeShortId = node ? nodeId.slice(-6) : null;
+      
+      // Build context string based on whether we have a selected node
+      const contextInfo = node 
+        ? `The currently selected node is: "${node.text}" (id: ${currentNodeShortId})\n\nGenerate nodes connected to this node.`
+        : nodes.length > 0 
+          ? `No node is currently selected. Generate new nodes that fit the existing graph context.`
+          : `The graph is currently empty. Generate a new mind map structure from scratch.`;
+      
+      const exampleEdges = node 
+        ? `{"from": "${currentNodeShortId}", "to": "new1"}`
+        : `{"from": "new1", "to": "new2"}`;
 
-      const systemPrompt = `You are a brainstorming assistant that helps expand mind maps. Given a mind map graph and a task, generate new nodes and edges to add to the graph.
+      const systemPrompt = `You are a brainstorming assistant that helps create and expand mind maps. Given a task, generate new nodes and edges.
 
 Current graph structure (JSON):
 ${JSON.stringify(graphData, null, 2)}
 
-The currently selected node is: "${node.text}" (id: ${currentNodeShortId})
+${contextInfo}
 
 User task: "${task}"
 
@@ -506,17 +517,18 @@ Respond with ONLY valid JSON in this exact format:
     {"id": "new2", "text": "Another node"}
   ],
   "edges": [
-    {"from": "${currentNodeShortId}", "to": "new1"},
+    ${exampleEdges},
     {"from": "new1", "to": "new2"}
   ]
 }
 
 Rules:
-- Use existing node IDs (like "${currentNodeShortId}") to connect to existing nodes
+- Use existing node IDs to connect to existing nodes if relevant
 - Use short new IDs (like "new1", "new2") for new nodes
 - Keep node text concise and relevant
-- Connect new nodes logically to the current node or other relevant nodes
-- Generate 2-6 new nodes typically`;
+- Connect new nodes logically
+- Generate 2-6 new nodes typically
+- If no node is selected but graph has nodes, you may connect to any relevant existing node`;
 
       let result = null;
 

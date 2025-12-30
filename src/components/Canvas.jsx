@@ -172,6 +172,13 @@ const Canvas = observer(function Canvas() {
     };
     window.addEventListener('brainstorm:first-visit-complete', handleFirstVisitComplete);
     
+    // Handle open AI prompt event (from Controls panel)
+    const handleOpenAIPrompt = () => {
+      // Will be handled by effect that sets up the actual handler
+      window.dispatchEvent(new CustomEvent('brainstorm:open-ai-prompt-internal'));
+    };
+    window.addEventListener('brainstorm:open-ai-prompt', handleOpenAIPrompt);
+    
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('brainstorm:fit-view', handleFitView);
@@ -180,6 +187,7 @@ const Canvas = observer(function Canvas() {
       window.removeEventListener('brainstorm:center-node', handleCenterNode);
       window.removeEventListener('brainstorm:create-node', handleCreateNewNode);
       window.removeEventListener('brainstorm:first-visit-complete', handleFirstVisitComplete);
+      window.removeEventListener('brainstorm:open-ai-prompt', handleOpenAIPrompt);
       simulation.dispose();
       renderer.dispose();
     };
@@ -200,7 +208,12 @@ const Canvas = observer(function Canvas() {
     uiStore.edgeCreation.active
   ]);
 
-  // Auto-trigger AI suggestions when a node becomes active
+  // Get active node state for effect dependency
+  const activeNodeForEffect = graphStore.getNode(uiStore.activeNodeId);
+  const activeNodeState = activeNodeForEffect?.state;
+  const activeNodeText = activeNodeForEffect?.text;
+
+  // Auto-trigger AI suggestions when a node becomes active (not editable)
   useEffect(() => {
     if (!uiStore.activeNodeId) {
       // Clear suggestions when no node is active
@@ -225,7 +238,7 @@ const Canvas = observer(function Canvas() {
     
     // Only show suggestions if:
     // - Node is active (not editable)
-    // - Node has text content
+    // - Node has text content (not empty)
     // - AI is configured and hints are enabled
     if (
       activeNode.state === NodeState.ACTIVE &&
@@ -242,7 +255,7 @@ const Canvas = observer(function Canvas() {
           console.error('Failed to generate AI suggestions:', err);
         });
     }
-  }, [uiStore.activeNodeId, graphStore, aiStore]);
+  }, [uiStore.activeNodeId, activeNodeState, activeNodeText, graphStore, aiStore]);
 
   // Handle node click
   const handleNodeClick = useCallback((nodeId, _event) => {
@@ -567,6 +580,81 @@ const Canvas = observer(function Canvas() {
     };
   }, [uiStore]);
 
+  // Handle virtual card click (accept AI suggestion)
+  const handleVirtualCardClick = useCallback((cardIndex) => {
+    const card = aiStore.virtualCards[cardIndex];
+    if (!card) return;
+    
+    const activeNode = graphStore.getNode(uiStore.activeNodeId);
+    if (!activeNode) return;
+    
+    // Find best position for new node
+    const offset = 200;
+    let newX = activeNode.x + activeNode.w + offset;
+    let newY = activeNode.y;
+    
+    // Check if right side is busy
+    const existingNodes = graphStore.getNodes();
+    const rightSideBusy = existingNodes.some(n => 
+      n.id !== activeNode.id && 
+      n.x > activeNode.x && 
+      Math.abs(n.x - newX) < 100 && 
+      Math.abs(n.y - newY) < 50
+    );
+    
+    if (rightSideBusy) {
+      newX = activeNode.x - offset - 160;
+    }
+    
+    // Create the real node
+    const newNode = graphStore.createNode({ x: newX, y: newY, text: card.text });
+    graphStore.createEdge(activeNode.id, newNode.id);
+    
+    aiStore.clearVirtualCards();
+    setSelectedVirtualCard(null);
+    
+    uiStore.setActiveNode(newNode.id);
+    
+    if (simulationRef.current) {
+      simulationRef.current.update();
+      simulationRef.current.reheat(0.3);
+    }
+    
+    rendererRef.current.centerOnNode(newNode.id);
+    rendererRef.current.render();
+  }, [graphStore, uiStore, aiStore]);
+
+  // Open AI prompt input - can work with or without active node
+  const openAIPromptInput = useCallback(() => {
+    if (!aiStore.isConfigured) {
+      aiStore.openModal();
+      uiStore.info('Configure AI to use generate feature');
+      return;
+    }
+    
+    const activeNode = graphStore.getNode(uiStore.activeNodeId);
+    
+    // Position near active node if available, otherwise center of screen
+    let screenX, screenY;
+    if (activeNode) {
+      const { x: viewX, y: viewY, scale } = uiStore.view;
+      screenX = (activeNode.x + activeNode.w / 2 + 20) * scale + viewX;
+      screenY = (activeNode.y - activeNode.h / 2 - 50) * scale + viewY;
+    } else {
+      screenX = window.innerWidth / 2 - 150;
+      screenY = window.innerHeight / 2 - 20;
+    }
+    
+    setAIInputPosition({ x: screenX, y: screenY });
+    setShowAIInput(true);
+    setAIInputValue('');
+    
+    // Focus input after it appears
+    setTimeout(() => {
+      aiInputRef.current?.focus();
+    }, 50);
+  }, [aiStore, graphStore, uiStore]);
+
   // Handle keyboard events
   const handleKeyDown = useCallback((event) => {
     // Skip if dev console is active and not F8/Escape
@@ -583,16 +671,19 @@ const Canvas = observer(function Canvas() {
     
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
     
-    // Cmd+P - Open AI prompt input (when generateEnabled)
+    // Cmd+P - Open AI prompt input (when generateEnabled) - works even without selection
     if ((event.metaKey || event.ctrlKey) && event.key === 'p') {
       event.preventDefault();
-      if (aiStore.generateEnabled && activeNode && activeNode.state !== NodeState.EDITABLE) {
+      if (aiStore.generateEnabled) {
         if (!aiStore.isConfigured) {
           aiStore.openModal();
           uiStore.info('Configure AI to use generate feature');
           return;
         }
-        handleAIIconClick();
+        // Can work without active node or with active non-editable node
+        if (!activeNode || activeNode.state !== NodeState.EDITABLE) {
+          openAIPromptInput();
+        }
       }
       return;
     }
@@ -1015,7 +1106,7 @@ const Canvas = observer(function Canvas() {
       setTimeout(() => focusNodeTextInput(newNode.id), 100);
       event.preventDefault();
     }
-  }, [graphStore, uiStore, undoStore]);
+  }, [graphStore, uiStore, undoStore, openAIPromptInput, aiStore, handleVirtualCardClick, selectedVirtualCard]);
 
   // Handle text input in nodes
   const handleNodeTextInput = useCallback((event) => {
@@ -1074,51 +1165,48 @@ const Canvas = observer(function Canvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // Fixed position for AI button when node is selected
+  // Listen for open AI prompt event from Controls panel
+  useEffect(() => {
+    const handleOpenAIPromptInternal = () => {
+      openAIPromptInput();
+    };
+    window.addEventListener('brainstorm:open-ai-prompt-internal', handleOpenAIPromptInternal);
+    return () => window.removeEventListener('brainstorm:open-ai-prompt-internal', handleOpenAIPromptInternal);
+  }, [openAIPromptInput]);
+
+  // Position AI button close to selected node
   const getAIIconPosition = useCallback(() => {
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
     if (!activeNode || activeNode.state === NodeState.EDITABLE) return null;
     
-    // Fixed position in viewport - bottom right area near the node
-    // This keeps the button stable and doesn't move across nodes
-    return { x: 60, y: window.innerHeight - 120 };
-  }, [graphStore, uiStore.activeNodeId]);
-
-  // Handle AI icon click
-  const handleAIIconClick = useCallback(() => {
-    if (!aiStore.isConfigured) {
-      aiStore.openModal();
-      uiStore.info('Configure AI to use generate feature');
-      return;
-    }
-    
-    const activeNode = graphStore.getNode(uiStore.activeNodeId);
-    if (!activeNode) return;
-    
     const { x: viewX, y: viewY, scale } = uiStore.view;
-    const screenX = (activeNode.x + activeNode.w / 2 + 20) * scale + viewX;
-    const screenY = (activeNode.y - activeNode.h / 2 - 50) * scale + viewY;
     
-    setAIInputPosition({ x: screenX, y: screenY });
-    setShowAIInput(true);
-    setAIInputValue('');
+    // Position at top-right corner of the node
+    const canvasX = activeNode.x + activeNode.w / 2 + 8;
+    const canvasY = activeNode.y - activeNode.h / 2 - 8;
     
-    // Focus input after it appears
-    setTimeout(() => {
-      aiInputRef.current?.focus();
-    }, 50);
-  }, [aiStore, graphStore, uiStore]);
+    // Convert to screen coordinates
+    const screenX = canvasX * scale + viewX;
+    const screenY = canvasY * scale + viewY;
+    
+    return { x: screenX, y: screenY };
+  }, [graphStore, uiStore.activeNodeId, uiStore.view]);
+
+  // Handle AI icon click (near node)
+  const handleAIIconClick = useCallback(() => {
+    openAIPromptInput();
+  }, [openAIPromptInput]);
 
   // Handle AI input submit
   const handleAIInputSubmit = useCallback(async () => {
-    if (!aiInputValue.trim() || !uiStore.activeNodeId) return;
+    if (!aiInputValue.trim()) return;
+    
+    // Get active node if any (can be null for generating new graph)
+    const activeNode = uiStore.activeNodeId ? graphStore.getNode(uiStore.activeNodeId) : null;
     
     const result = await aiStore.generateFromTask(graphStore, uiStore.activeNodeId, aiInputValue);
     
     if (result && result.nodes && result.edges) {
-      const activeNode = graphStore.getNode(uiStore.activeNodeId);
-      if (!activeNode) return;
-      
       // Collect all actions for batch undo
       const batchActions = [];
       
@@ -1130,14 +1218,26 @@ const Canvas = observer(function Canvas() {
         idMap.set(node.id.slice(-6), node.id);
       }
       
+      // Base position: near active node or center of view
+      let baseX = 0, baseY = 0;
+      if (activeNode) {
+        baseX = activeNode.x;
+        baseY = activeNode.y;
+      } else {
+        // Center of current view
+        const { x, y, scale } = uiStore.view;
+        baseX = (rendererRef.current?.width / 2 - x) / scale || 0;
+        baseY = (rendererRef.current?.height / 2 - y) / scale || 0;
+      }
+      
       // Create new nodes (without recording undo individually)
       const baseOffset = 200;
       result.nodes.forEach((nodeData, index) => {
         const angle = (index / result.nodes.length) * Math.PI * 2;
         const radius = baseOffset + (index % 2) * 80;
         
-        const newX = activeNode.x + Math.cos(angle) * radius;
-        const newY = activeNode.y + Math.sin(angle) * radius;
+        const newX = baseX + Math.cos(angle) * radius;
+        const newY = baseY + Math.sin(angle) * radius;
         
         const newNode = graphStore.createNode({ 
           x: newX, 
@@ -1212,51 +1312,7 @@ const Canvas = observer(function Canvas() {
 
   const aiIconPosition = getAIIconPosition();
 
-  // Handle virtual card click
-  const handleVirtualCardClick = useCallback((cardIndex) => {
-    const card = aiStore.virtualCards[cardIndex];
-    if (!card) return;
-    
-    const activeNode = graphStore.getNode(uiStore.activeNodeId);
-    if (!activeNode) return;
-    
-    // Find best position for new node
-    const offset = 200;
-    let newX = activeNode.x + activeNode.w + offset;
-    let newY = activeNode.y;
-    
-    // Check if right side is busy
-    const existingNodes = graphStore.getNodes();
-    const rightSideBusy = existingNodes.some(n => 
-      n.id !== activeNode.id && 
-      n.x > activeNode.x && 
-      Math.abs(n.x - newX) < 100 && 
-      Math.abs(n.y - newY) < 50
-    );
-    
-    if (rightSideBusy) {
-      newX = activeNode.x - offset - 160;
-    }
-    
-    // Create the real node
-    const newNode = graphStore.createNode({ x: newX, y: newY, text: card.text });
-    graphStore.createEdge(activeNode.id, newNode.id);
-    
-    aiStore.clearVirtualCards();
-    setSelectedVirtualCard(null);
-    
-    uiStore.setActiveNode(newNode.id);
-    
-    if (simulationRef.current) {
-      simulationRef.current.update();
-      simulationRef.current.reheat(0.3);
-    }
-    
-    rendererRef.current.centerOnNode(newNode.id);
-    rendererRef.current.render();
-  }, [graphStore, uiStore, aiStore]);
-
-  // Calculate virtual card positions - fixed position to avoid overlaps
+  // Calculate virtual card positions - positioned near the active node
   const getVirtualCardPositions = useCallback(() => {
     if (aiStore.virtualCards.length === 0) return [];
     
@@ -1264,22 +1320,22 @@ const Canvas = observer(function Canvas() {
     if (!activeNode) return [];
     
     const { x: viewX, y: viewY, scale } = uiStore.view;
-    const cardWidth = 180;
-    const cardHeight = 48;
-    const gap = 12;
+    const cardWidth = 160;
+    const cardHeight = 40;
+    const gap = 8;
+    const offsetFromNode = 20;
     
-    // Fixed position: right side of screen, centered vertically
-    const baseX = window.innerWidth - cardWidth - 40;
+    // Position to the right of the node
+    const nodeRightX = (activeNode.x + activeNode.w / 2 + offsetFromNode) * scale + viewX;
+    const nodeCenterY = activeNode.y * scale + viewY;
+    
+    // Calculate total height of all cards
     const totalHeight = aiStore.virtualCards.length * cardHeight + (aiStore.virtualCards.length - 1) * gap;
-    const baseY = (window.innerHeight - totalHeight) / 2;
-    
-    // Get node screen position for arrow
-    const nodeScreenX = (activeNode.x + activeNode.w / 2) * scale + viewX;
-    const nodeScreenY = activeNode.y * scale + viewY;
+    const startY = nodeCenterY - totalHeight / 2;
     
     return aiStore.virtualCards.map((card, index) => {
-      const screenX = baseX;
-      const screenY = baseY + index * (cardHeight + gap);
+      const screenX = nodeRightX;
+      const screenY = startY + index * (cardHeight + gap);
       
       return {
         ...card,
@@ -1289,8 +1345,8 @@ const Canvas = observer(function Canvas() {
         width: cardWidth,
         height: cardHeight,
         // Arrow start point (from active node)
-        arrowStartX: Math.min(nodeScreenX + 80, screenX - 20),
-        arrowStartY: nodeScreenY,
+        arrowStartX: (activeNode.x + activeNode.w / 2) * scale + viewX,
+        arrowStartY: nodeCenterY,
         // Arrow end point (to virtual card)
         arrowEndX: screenX,
         arrowEndY: screenY + cardHeight / 2

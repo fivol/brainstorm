@@ -105,7 +105,7 @@ const EXAMPLES = [
  * Help panel component with all interactions and shortcuts.
  */
 const HelpPanel = observer(function HelpPanel() {
-  const { uiStore, graphStore } = useStores();
+  const { uiStore, graphStore, aiStore } = useStores();
   
   if (!uiStore.helpVisible) return null;
   
@@ -227,6 +227,33 @@ const HelpPanel = observer(function HelpPanel() {
               }}
             >
               Open Dev Console
+            </button>
+          </section>
+          
+          <section className="help-section help-section-ai">
+            <h3>AI Assistant</h3>
+            <p className="help-ai-desc">
+              Use AI to generate ideas and expand your mind map. Configure an API key to enable AI features.
+            </p>
+            <ul>
+              <li><kbd>Ctrl/⌘ + P</kbd> — Open AI prompt (generate nodes)</li>
+              <li><kbd>Ctrl + Space</kbd> — Get AI suggestions for selected node</li>
+              <li><kbd>↑</kbd> / <kbd>↓</kbd> — Navigate between suggestions</li>
+              <li><kbd>Enter</kbd> — Accept selected suggestion</li>
+              <li><kbd>Escape</kbd> — Dismiss suggestions</li>
+            </ul>
+            <div className="help-ai-status">
+              <span className={`help-ai-indicator ${aiStore.isConfigured ? 'configured' : ''}`}></span>
+              <span>{aiStore.isConfigured ? 'AI Configured' : 'AI Not Configured'}</span>
+            </div>
+            <button 
+              className="help-ai-configure-btn"
+              onClick={() => {
+                uiStore.hideHelp();
+                aiStore.openModal();
+              }}
+            >
+              {aiStore.isConfigured ? 'AI Settings' : 'Configure AI'}
             </button>
           </section>
           </div>

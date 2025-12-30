@@ -359,6 +359,26 @@ const Controls = observer(function Controls({ canvasRef }) {
         <div className="controls-divider" />
         
         <div className="controls-group">
+          {/* AI Generate Button - always visible if feature enabled */}
+          {aiStore.generateEnabled && (
+            <button 
+              className={`control-btn control-btn-ai ${aiStore.isConfigured ? 'control-btn-ai-configured' : ''}`}
+              onClick={() => {
+                if (!aiStore.isConfigured) {
+                  aiStore.openModal();
+                  uiStore.info('Configure AI to use generate feature');
+                } else {
+                  window.dispatchEvent(new CustomEvent('brainstorm:open-ai-prompt'));
+                }
+              }}
+              data-tooltip="AI Generate (⌘P)"
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18">
+                <path fill="currentColor" d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H5.17L4 17.17V4h16v12z"/>
+              </svg>
+            </button>
+          )}
+          
           <button 
             className={`control-btn ${showSettings ? 'control-btn-active' : ''}`}
             onClick={() => setShowSettings(!showSettings)}
