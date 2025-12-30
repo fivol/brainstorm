@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useStores } from '../stores';
 import { CanvasRenderer } from '../canvas/CanvasRenderer';
@@ -12,10 +12,14 @@ import './Canvas.css';
  * Integrates D3 rendering with React and MobX.
  */
 const Canvas = observer(function Canvas() {
-  const { graphStore, uiStore, undoStore } = useStores();
+  const { graphStore, uiStore, undoStore, aiStore } = useStores();
   
-  // Virtual cards selection state (currently disabled)
-  // const [selectedVirtualCard, setSelectedVirtualCard] = useState(null);
+  // AI Generate state
+  const [showAIInput, setShowAIInput] = useState(false);
+  const [aiInputValue, setAIInputValue] = useState('');
+  const [aiInputPosition, setAIInputPosition] = useState({ x: 0, y: 0 });
+  const aiInputRef = useRef(null);
+  
   const svgRef = useRef(null);
   const rendererRef = useRef(null);
   const simulationRef = useRef(null);
@@ -981,6 +985,123 @@ const Canvas = observer(function Canvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  // Calculate AI icon position for active node
+  const getAIIconPosition = useCallback(() => {
+    const activeNode = graphStore.getNode(uiStore.activeNodeId);
+    if (!activeNode || activeNode.state === NodeState.EDITABLE) return null;
+    
+    const { x: viewX, y: viewY, scale } = uiStore.view;
+    
+    // Position at top-right of node
+    const canvasX = activeNode.x + activeNode.w / 2 + 10;
+    const canvasY = activeNode.y - activeNode.h / 2 - 10;
+    
+    // Convert to screen coordinates
+    const screenX = canvasX * scale + viewX;
+    const screenY = canvasY * scale + viewY;
+    
+    return { x: screenX, y: screenY };
+  }, [graphStore, uiStore.activeNodeId, uiStore.view]);
+
+  // Handle AI icon click
+  const handleAIIconClick = useCallback(() => {
+    if (!aiStore.isConfigured) {
+      aiStore.openModal();
+      uiStore.info('Configure AI to use generate feature');
+      return;
+    }
+    
+    const activeNode = graphStore.getNode(uiStore.activeNodeId);
+    if (!activeNode) return;
+    
+    const { x: viewX, y: viewY, scale } = uiStore.view;
+    const screenX = (activeNode.x + activeNode.w / 2 + 20) * scale + viewX;
+    const screenY = (activeNode.y - activeNode.h / 2 - 50) * scale + viewY;
+    
+    setAIInputPosition({ x: screenX, y: screenY });
+    setShowAIInput(true);
+    setAIInputValue('');
+    
+    // Focus input after it appears
+    setTimeout(() => {
+      aiInputRef.current?.focus();
+    }, 50);
+  }, [aiStore, graphStore, uiStore]);
+
+  // Handle AI input submit
+  const handleAIInputSubmit = useCallback(async () => {
+    if (!aiInputValue.trim() || !uiStore.activeNodeId) return;
+    
+    const result = await aiStore.generateFromTask(graphStore, uiStore.activeNodeId, aiInputValue);
+    
+    if (result && result.nodes && result.edges) {
+      const activeNode = graphStore.getNode(uiStore.activeNodeId);
+      if (!activeNode) return;
+      
+      // Create a mapping from short IDs to full IDs
+      const idMap = new Map();
+      
+      // Map existing node short IDs
+      for (const node of graphStore.getNodes()) {
+        idMap.set(node.id.slice(-6), node.id);
+      }
+      
+      // Create new nodes
+      const baseOffset = 200;
+      result.nodes.forEach((nodeData, index) => {
+        const angle = (index / result.nodes.length) * Math.PI * 2;
+        const radius = baseOffset + (index % 2) * 80;
+        
+        const newX = activeNode.x + Math.cos(angle) * radius;
+        const newY = activeNode.y + Math.sin(angle) * radius;
+        
+        const newNode = graphStore.createNode({ 
+          x: newX, 
+          y: newY, 
+          text: nodeData.text 
+        });
+        
+        // Map the new short ID to the full ID
+        idMap.set(nodeData.id, newNode.id);
+      });
+      
+      // Create edges
+      result.edges.forEach((edgeData) => {
+        const sourceId = idMap.get(edgeData.from);
+        const targetId = idMap.get(edgeData.to);
+        
+        if (sourceId && targetId) {
+          graphStore.createEdge(sourceId, targetId);
+        }
+      });
+      
+      // Update simulation and render
+      if (simulationRef.current) {
+        simulationRef.current.update();
+        simulationRef.current.reheat(0.5);
+      }
+      
+      rendererRef.current.render();
+      uiStore.info(`Generated ${result.nodes.length} nodes`);
+    }
+    
+    setShowAIInput(false);
+    setAIInputValue('');
+  }, [aiInputValue, aiStore, graphStore, uiStore]);
+
+  // Handle AI input key down
+  const handleAIInputKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleAIInputSubmit();
+    } else if (e.key === 'Escape') {
+      setShowAIInput(false);
+      setAIInputValue('');
+    }
+  }, [handleAIInputSubmit]);
+
+  const aiIconPosition = getAIIconPosition();
+
   // Handle virtual card click (currently disabled)
   /* const handleVirtualCardClick = useCallback((cardIndex) => {
     const card = aiStore.virtualCards[cardIndex];
@@ -1077,6 +1198,67 @@ const Canvas = observer(function Canvas() {
         onMouseUp={handleCanvasMouseUp}
         onMouseLeave={handleCanvasMouseUp}
       />
+      
+      {/* AI Generate Icon */}
+      {aiIconPosition && aiStore.generateEnabled && aiStore.isConfigured && !showAIInput && (
+        <button
+          className="ai-generate-icon"
+          style={{
+            left: aiIconPosition.x,
+            top: aiIconPosition.y,
+          }}
+          onClick={handleAIIconClick}
+          title="Generate nodes with AI"
+        >
+          <svg viewBox="0 0 24 24" width="16" height="16">
+            <path fill="currentColor" d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+          </svg>
+        </button>
+      )}
+      
+      {/* AI Generate Input */}
+      {showAIInput && (
+        <div 
+          className="ai-generate-input-container"
+          style={{
+            left: aiInputPosition.x,
+            top: aiInputPosition.y,
+          }}
+        >
+          <input
+            ref={aiInputRef}
+            type="text"
+            className="ai-generate-input"
+            placeholder="Describe what to generate..."
+            value={aiInputValue}
+            onChange={(e) => setAIInputValue(e.target.value)}
+            onKeyDown={handleAIInputKeyDown}
+            onBlur={() => {
+              // Delay to allow click on submit
+              setTimeout(() => {
+                if (!aiStore.generateLoading) {
+                  setShowAIInput(false);
+                }
+              }, 200);
+            }}
+          />
+          {aiStore.generateLoading ? (
+            <div className="ai-generate-loading">
+              <span className="ai-generate-spinner" />
+            </div>
+          ) : (
+            <button 
+              className="ai-generate-submit"
+              onClick={handleAIInputSubmit}
+              disabled={!aiInputValue.trim()}
+            >
+              <svg viewBox="0 0 24 24" width="16" height="16">
+                <path fill="currentColor" d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
       
       {/* Virtual Cards Overlay - Hidden */}
       {/* {virtualCardPositions.length > 0 && (

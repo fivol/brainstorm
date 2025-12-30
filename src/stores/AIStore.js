@@ -81,6 +81,14 @@ class AIStore {
   
   /** Current node ID for which suggestions are shown */
   suggestionsForNodeId = null;
+  
+  /** Feature toggles */
+  hintsEnabled = true;
+  generateEnabled = true;
+  
+  /** AI generation state */
+  generateInputVisible = false;
+  generateLoading = false;
 
   constructor() {
     makeAutoObservable(this);
@@ -98,6 +106,8 @@ class AIStore {
         if (config.provider) this.provider = config.provider;
         if (config.apiKeys) this.apiKeys = { ...this.apiKeys, ...config.apiKeys };
         if (config.selectedModels) this.selectedModels = { ...this.selectedModels, ...config.selectedModels };
+        if (config.hintsEnabled !== undefined) this.hintsEnabled = config.hintsEnabled;
+        if (config.generateEnabled !== undefined) this.generateEnabled = config.generateEnabled;
       }
     } catch (e) {
       console.warn('Failed to load AI config:', e);
@@ -112,12 +122,41 @@ class AIStore {
       const config = {
         provider: this.provider,
         apiKeys: this.apiKeys,
-        selectedModels: this.selectedModels
+        selectedModels: this.selectedModels,
+        hintsEnabled: this.hintsEnabled,
+        generateEnabled: this.generateEnabled
       };
       localStorage.setItem(AI_STORAGE_KEY, JSON.stringify(config));
     } catch (e) {
       console.warn('Failed to save AI config:', e);
     }
+  }
+  
+  /**
+   * Toggle hints enabled
+   */
+  setHintsEnabled(enabled) {
+    this.hintsEnabled = enabled;
+    this.saveConfig();
+  }
+  
+  /**
+   * Toggle generate enabled
+   */
+  setGenerateEnabled(enabled) {
+    this.generateEnabled = enabled;
+    this.saveConfig();
+  }
+  
+  /**
+   * Show/hide generate input
+   */
+  showGenerateInput() {
+    this.generateInputVisible = true;
+  }
+  
+  hideGenerateInput() {
+    this.generateInputVisible = false;
   }
 
   /**
@@ -395,6 +434,131 @@ Respond with ONLY a JSON array of ${numSuggestions} strings, no explanation. Exa
       return result;
     }
     return null;
+  }
+
+  /**
+   * Generate new nodes and edges based on a task
+   * @param {Object} graphStore - Graph store
+   * @param {string} nodeId - Source node ID
+   * @param {string} task - Task description from user
+   */
+  async generateFromTask(graphStore, nodeId, task) {
+    const node = graphStore.getNode(nodeId);
+    if (!node || !this.isConfigured || !task.trim()) return null;
+
+    this.generateLoading = true;
+
+    try {
+      // Build context from graph
+      const nodes = graphStore.getNodes();
+      const edges = graphStore.getEdges();
+      
+      // Build a text representation of the graph
+      const graphData = {
+        nodes: nodes.map(n => ({
+          id: n.id.slice(-6),
+          text: n.text
+        })),
+        edges: edges.map(e => ({
+          from: e.sourceId.slice(-6),
+          to: e.targetId.slice(-6)
+        }))
+      };
+
+      const currentNodeShortId = nodeId.slice(-6);
+
+      const systemPrompt = `You are a brainstorming assistant that helps expand mind maps. Given a mind map graph and a task, generate new nodes and edges to add to the graph.
+
+Current graph structure (JSON):
+${JSON.stringify(graphData, null, 2)}
+
+The currently selected node is: "${node.text}" (id: ${currentNodeShortId})
+
+User task: "${task}"
+
+Generate new nodes and edges that fulfill the task. Each node text should be concise (2-8 words).
+
+Respond with ONLY valid JSON in this exact format:
+{
+  "nodes": [
+    {"id": "new1", "text": "Node text here"},
+    {"id": "new2", "text": "Another node"}
+  ],
+  "edges": [
+    {"from": "${currentNodeShortId}", "to": "new1"},
+    {"from": "new1", "to": "new2"}
+  ]
+}
+
+Rules:
+- Use existing node IDs (like "${currentNodeShortId}") to connect to existing nodes
+- Use short new IDs (like "new1", "new2") for new nodes
+- Keep node text concise and relevant
+- Connect new nodes logically to the current node or other relevant nodes
+- Generate 2-6 new nodes typically`;
+
+      let result = null;
+
+      if (this.provider === LLMProviders.OPENAI) {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.currentApiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: this.currentModel,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: `Task: ${task}` }
+            ],
+            max_tokens: 1000,
+            temperature: 0.7
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const content = data.choices?.[0]?.message?.content || '{}';
+          result = JSON.parse(content);
+        }
+      } else if (this.provider === LLMProviders.ANTHROPIC) {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': this.currentApiKey,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+            'anthropic-dangerous-direct-browser-access': 'true'
+          },
+          body: JSON.stringify({
+            model: this.currentModel,
+            max_tokens: 1000,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: `Task: ${task}` }]
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const content = data.content?.[0]?.text || '{}';
+          result = JSON.parse(content);
+        }
+      }
+
+      runInAction(() => {
+        this.generateLoading = false;
+        this.generateInputVisible = false;
+      });
+
+      return result;
+    } catch (e) {
+      console.error('Failed to generate from task:', e);
+      runInAction(() => {
+        this.generateLoading = false;
+      });
+      return null;
+    }
   }
 }
 

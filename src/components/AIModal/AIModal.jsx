@@ -34,6 +34,14 @@ const AIModal = observer(function AIModal() {
     aiStore.setModel(modelId);
   }, [aiStore]);
 
+  const handleHintsToggle = useCallback(() => {
+    aiStore.setHintsEnabled(!aiStore.hintsEnabled);
+  }, [aiStore]);
+
+  const handleGenerateToggle = useCallback(() => {
+    aiStore.setGenerateEnabled(!aiStore.generateEnabled);
+  }, [aiStore]);
+
   if (!aiStore.modalOpen) return null;
 
   const recommended = RecommendedModels[aiStore.provider];
@@ -161,6 +169,37 @@ const AIModal = observer(function AIModal() {
                 </option>
               ))}
             </select>
+          </div>
+
+          {/* Feature Toggles */}
+          <div className="ai-section">
+            <label className="ai-label">Features</label>
+            <div className="ai-toggles">
+              <label className="ai-toggle">
+                <input
+                  type="checkbox"
+                  checked={aiStore.hintsEnabled}
+                  onChange={handleHintsToggle}
+                />
+                <span className="ai-toggle-slider"></span>
+                <div className="ai-toggle-content">
+                  <span className="ai-toggle-title">AI Hints</span>
+                  <span className="ai-toggle-desc">Show AI suggestions with Ctrl+Space</span>
+                </div>
+              </label>
+              <label className="ai-toggle">
+                <input
+                  type="checkbox"
+                  checked={aiStore.generateEnabled}
+                  onChange={handleGenerateToggle}
+                />
+                <span className="ai-toggle-slider"></span>
+                <div className="ai-toggle-content">
+                  <span className="ai-toggle-title">AI Generate</span>
+                  <span className="ai-toggle-desc">Generate nodes from tasks via AI icon</span>
+                </div>
+              </label>
+            </div>
           </div>
         </div>
 

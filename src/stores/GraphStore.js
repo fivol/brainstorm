@@ -251,13 +251,16 @@ class GraphStore {
   /**
    * Recalculate node size based on content and state.
    * Node grows horizontally up to MAX_NODE_WIDTH (~6 words), then grows vertically.
+   * For editable nodes, height caps at 3 lines max (scrollable after).
    * @param {string} nodeId
    */
   recalculateNodeSize(nodeId) {
     const node = this.nodes.get(nodeId);
     if (!node) return;
     
-    const isExpanded = node.state === NodeState.ACTIVE || node.state === NodeState.EDITABLE;
+    const isEditable = node.state === NodeState.EDITABLE;
+    const isActive = node.state === NodeState.ACTIVE;
+    const isExpanded = isActive || isEditable;
     
     // If text is empty, use default size
     const text = node.text?.trim() || '';
@@ -272,15 +275,28 @@ class GraphStore {
     const maxWidth = GraphStore.MAX_NODE_WIDTH;
     
     const measured = measureText(node.text, undefined, maxWidth);
+    const lineHeight = 20;
+    const verticalPadding = 24; // 12px top + 12px bottom
+    const maxLinesWithoutScroll = 3;
     
     // Padding: 16px horizontal, 12px vertical
     // Width grows up to maxWidth, then wraps and height grows
     node.w = Math.min(maxWidth, Math.max(GraphStore.DEFAULT_NODE_WIDTH, measured.width + 32));
-    node.h = Math.max(GraphStore.DEFAULT_NODE_HEIGHT, measured.height + 24);
     
-    // For inactive state, limit height to ~3 lines (truncated view)
-    if (!isExpanded && measured.lines.length > 3) {
-      node.h = 3 * 20 + 24;
+    if (isEditable) {
+      // For editable state: grow up to 3 lines, then cap height (content scrolls)
+      const maxHeight = maxLinesWithoutScroll * lineHeight + verticalPadding;
+      node.h = Math.min(maxHeight, Math.max(GraphStore.DEFAULT_NODE_HEIGHT, measured.height + verticalPadding));
+    } else if (isActive) {
+      // For active state: show full content (no limit)
+      node.h = Math.max(GraphStore.DEFAULT_NODE_HEIGHT, measured.height + verticalPadding);
+    } else {
+      // For inactive state, limit height to ~3 lines (truncated view)
+      if (measured.lines.length > 3) {
+        node.h = maxLinesWithoutScroll * lineHeight + verticalPadding;
+      } else {
+        node.h = Math.max(GraphStore.DEFAULT_NODE_HEIGHT, measured.height + verticalPadding);
+      }
     }
   }
 

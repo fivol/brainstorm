@@ -132,6 +132,8 @@ class UIStore {
   exitEditable(nodeId) {
     if (this.graphStore) {
       this.graphStore.setNodeState(nodeId, NodeState.ACTIVE);
+      // Auto-set title from first node when exiting editable mode
+      this.graphStore.autoSetTitleFromFirstNode();
     }
   }
 

@@ -348,15 +348,24 @@ export class CanvasRenderer {
           .style('height', '100%')
           .style('padding', '12px 16px')
           .style('box-sizing', 'border-box')
-          .style('overflow', isExpanded ? 'auto' : 'hidden')
           .style('font-size', '14px')
           .style('line-height', '1.4')
           .style('color', 'var(--text-color)')
           .style('outline', 'none');
       }
       
+      // Calculate line count to determine overflow behavior
+      // Line height is 20px (14px * 1.4 = ~20px), max 3 lines = 60px text height
+      const textContent = d.text || '';
+      const lineHeight = 20;
+      const maxLinesWithoutScroll = 3;
+      const maxTextHeight = maxLinesWithoutScroll * lineHeight;
+      const textHeight = d.h - 24; // Subtract padding (12px top + 12px bottom)
+      const needsScroll = isEditable && textHeight > maxTextHeight;
+      
       contentDiv
-        .style('overflow', isExpanded ? 'auto' : 'hidden')
+        .style('overflow-x', 'hidden')
+        .style('overflow-y', needsScroll ? 'auto' : 'hidden')
         .attr('contenteditable', isEditable ? 'true' : 'false')
         .style('cursor', isEditable ? 'text' : 'default');
       
