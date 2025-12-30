@@ -513,19 +513,17 @@ const Canvas = observer(function Canvas() {
         const nodeText = activeNode.text?.trim() || '';
         if (!nodeText) {
           graphStore.deleteNode(activeNode.id, false);
-          uiStore.clearSelection();
           uiStore.info('Empty node removed');
         } else {
-          uiStore.exitEditable(activeNode.id);
           graphStore.recalculateNodeSize(activeNode.id);
         }
         if (simulationRef.current) {
           simulationRef.current.update();
           simulationRef.current.reheat(0.1);
         }
-      } else {
-        uiStore.clearSelection();
       }
+      // Always clear selection on Escape
+      uiStore.clearSelection();
       rendererRef.current.render();
       return;
     }
