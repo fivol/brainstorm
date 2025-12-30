@@ -311,17 +311,33 @@ const Canvas = observer(function Canvas() {
     const clickedNode = findNodeAtPosition(pos.x, pos.y);
     if (clickedNode) return;
     
+    // Track potential rect selection start - but don't start it yet
+    // Only start if mouse moves (handled in handleCanvasMouseMove)
     dragStateRef.current = {
-      isDragging: true,
+      isDragging: false,
       startX: pos.x,
       startY: pos.y,
-      isRectSelect: true
+      screenStartX: event.clientX,
+      screenStartY: event.clientY,
+      isPotentialRectSelect: true,
+      isRectSelect: false
     };
-    
-    uiStore.startRectSelection(pos.x, pos.y);
-  }, [uiStore]);
+  }, []);
 
   const handleCanvasMouseMove = useCallback((event) => {
+    // Check if we should start a rect selection (mouse moved enough)
+    if (dragStateRef.current.isPotentialRectSelect && !dragStateRef.current.isRectSelect) {
+      const dx = Math.abs(event.clientX - dragStateRef.current.screenStartX);
+      const dy = Math.abs(event.clientY - dragStateRef.current.screenStartY);
+      
+      // Start rect selection only if mouse moved more than 5 pixels
+      if (dx > 5 || dy > 5) {
+        dragStateRef.current.isRectSelect = true;
+        dragStateRef.current.isDragging = true;
+        uiStore.startRectSelection(dragStateRef.current.startX, dragStateRef.current.startY);
+      }
+    }
+    
     if (!dragStateRef.current.isRectSelect) return;
     
     const pos = rendererRef.current.screenToCanvas(event.clientX, event.clientY);
@@ -348,10 +364,14 @@ const Canvas = observer(function Canvas() {
       // Mark that we just finished a rect selection to prevent click from creating a node
       justFinishedRectSelection.current = true;
       uiStore.endRectSelection();
-      dragStateRef.current.isRectSelect = false;
       rendererRef.current.render();
     }
-    dragStateRef.current.isDragging = false;
+    // Reset all drag state
+    dragStateRef.current = {
+      isDragging: false,
+      isRectSelect: false,
+      isPotentialRectSelect: false
+    };
   }, [uiStore]);
 
   // Handle keyboard events

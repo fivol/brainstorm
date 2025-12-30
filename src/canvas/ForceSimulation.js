@@ -1,4 +1,5 @@
 import * as d3 from 'd3';
+import { runInAction } from 'mobx';
 
 /**
  * Force simulation manager for graph layout.
@@ -154,13 +155,15 @@ export class ForceSimulation {
    */
   syncToStore() {
     const simNodes = this.simulation.nodes();
-    for (const simNode of simNodes) {
-      const storeNode = this.graphStore.getNode(simNode.id);
-      if (storeNode) {
-        storeNode.x = simNode.x;
-        storeNode.y = simNode.y;
+    runInAction(() => {
+      for (const simNode of simNodes) {
+        const storeNode = this.graphStore.getNode(simNode.id);
+        if (storeNode) {
+          storeNode.x = simNode.x;
+          storeNode.y = simNode.y;
+        }
       }
-    }
+    });
   }
 
   /**
