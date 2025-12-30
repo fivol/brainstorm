@@ -133,3 +133,4 @@ export const resolveCollisions = (
   return hasChanges ? updatedBlocks : blocksToResolve
 }
 
+
