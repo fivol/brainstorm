@@ -80,6 +80,22 @@ const HelpPanel = observer(function HelpPanel() {
               <li><kbd>Ctrl/⌘ + Shift + Z</kbd> — Redo</li>
             </ul>
           </section>
+          
+          <section className="help-section">
+            <h3>Dev Mode</h3>
+            <ul>
+              <li><kbd>F8</kbd> — Toggle dev console</li>
+            </ul>
+            <button 
+              className="help-dev-mode-btn"
+              onClick={() => {
+                uiStore.hideHelp();
+                uiStore.showDevMode();
+              }}
+            >
+              Open Dev Console
+            </button>
+          </section>
         </div>
       </div>
     </div>

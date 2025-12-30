@@ -34,6 +34,9 @@ class UIStore {
   /** Help panel visibility */
   helpVisible = false;
   
+  /** Dev mode active */
+  devModeActive = false;
+  
   /** Edge creation state */
   edgeCreation = {
     active: false,
@@ -412,6 +415,20 @@ class UIStore {
 
   hideHelp() {
     this.helpVisible = false;
+  }
+
+  // ============== Dev Mode ==============
+
+  toggleDevMode() {
+    this.devModeActive = !this.devModeActive;
+  }
+
+  showDevMode() {
+    this.devModeActive = true;
+  }
+
+  hideDevMode() {
+    this.devModeActive = false;
   }
 }
 

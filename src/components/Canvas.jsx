@@ -61,9 +61,50 @@ const Canvas = observer(function Canvas() {
     };
     window.addEventListener('brainstorm:fit-view', handleFitView);
     
+    // Handle focus node event (from DevConsole)
+    const handleFocusNode = (event) => {
+      const { nodeId } = event.detail;
+      if (nodeId) {
+        const nodeEl = svgRef.current?.querySelector(`[data-node-id="${nodeId}"] .node-text-container`);
+        if (nodeEl) {
+          nodeEl.focus();
+          const range = document.createRange();
+          range.selectNodeContents(nodeEl);
+          range.collapse(false);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+    };
+    window.addEventListener('brainstorm:focus-node', handleFocusNode);
+    
+    // Handle update simulation event (from DevConsole)
+    const handleUpdateSimulation = () => {
+      if (simulationRef.current) {
+        simulationRef.current.update();
+        simulationRef.current.reheat(0.2);
+      }
+      renderer.render();
+    };
+    window.addEventListener('brainstorm:update-simulation', handleUpdateSimulation);
+    
+    // Handle center on node event (from DevConsole)
+    const handleCenterNode = (event) => {
+      const { nodeId } = event.detail;
+      if (nodeId) {
+        renderer.centerOnNode(nodeId);
+        renderer.render();
+      }
+    };
+    window.addEventListener('brainstorm:center-node', handleCenterNode);
+    
     return () => {
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('brainstorm:fit-view', handleFitView);
+      window.removeEventListener('brainstorm:focus-node', handleFocusNode);
+      window.removeEventListener('brainstorm:update-simulation', handleUpdateSimulation);
+      window.removeEventListener('brainstorm:center-node', handleCenterNode);
       simulation.dispose();
       renderer.dispose();
     };
@@ -298,8 +339,7 @@ const Canvas = observer(function Canvas() {
       simulationRef.current.reheat(0.2);
     }
     
-    // Center on new node and render
-    rendererRef.current.centerOnNode(node.id, false);
+    // Render (node is already at cursor position, no need to center)
     rendererRef.current.render();
     setTimeout(() => focusNodeTextInput(node.id), 100);
   }, [graphStore, uiStore]);
@@ -386,6 +426,18 @@ const Canvas = observer(function Canvas() {
 
   // Handle keyboard events
   const handleKeyDown = useCallback((event) => {
+    // Skip if dev console is active and not F8/Escape
+    if (uiStore.devModeActive && event.key !== 'F8' && event.key !== 'Escape') {
+      return;
+    }
+    
+    // F8 - Toggle dev mode
+    if (event.key === 'F8') {
+      event.preventDefault();
+      uiStore.toggleDevMode();
+      return;
+    }
+    
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
     
     // Global shortcuts

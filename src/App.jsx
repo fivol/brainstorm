@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { observer } from 'mobx-react-lite';
-import { Canvas, Controls, HelpPanel, ToastContainer } from './components';
+import { Canvas, Controls, HelpPanel, ToastContainer, DevConsole } from './components';
 import { StoreContext, graphStore, uiStore, undoStore } from './stores';
 import { PersistenceService } from './services/persistence';
 import './App.css';
@@ -39,6 +39,7 @@ const App = observer(function App() {
         <Controls canvasRef={canvasRef} />
         <HelpPanel />
         <ToastContainer />
+        <DevConsole />
       </div>
     </StoreContext.Provider>
   );
