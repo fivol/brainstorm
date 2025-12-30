@@ -232,10 +232,21 @@ class GraphStore {
     if (!node) return;
     
     const prevState = node.state;
-    node.state = state;
-    
+    const isEnteringEditable = state === NodeState.EDITABLE && prevState !== NodeState.EDITABLE;
     const wasEditable = prevState === NodeState.EDITABLE;
     const isExpanded = state === NodeState.ACTIVE || state === NodeState.EDITABLE;
+    
+    // Store initial width when entering edit mode (node can only grow, not shrink during edit)
+    if (isEnteringEditable) {
+      node._editStartWidth = node.w;
+    }
+    
+    // Clear edit start width when exiting editable mode
+    if (wasEditable && state !== NodeState.EDITABLE) {
+      delete node._editStartWidth;
+    }
+    
+    node.state = state;
     
     // Recalculate when exiting editable mode (to fit node width to text)
     if (wasEditable) {
@@ -280,7 +291,11 @@ class GraphStore {
     
     // Padding: 16px horizontal (32px total), 12px vertical
     // Width based on actual text size, with min/max constraints
-    node.w = Math.min(maxWidth, Math.max(GraphStore.MIN_NODE_WIDTH, measured.width + 32));
+    // During editing, node can only grow (use edit start width as minimum)
+    const minWidth = isEditable && node._editStartWidth 
+      ? Math.max(GraphStore.MIN_NODE_WIDTH, node._editStartWidth) 
+      : GraphStore.MIN_NODE_WIDTH;
+    node.w = Math.min(maxWidth, Math.max(minWidth, measured.width + 32));
     
     if (isEditable) {
       // For editable state: grow up to 3 lines, then cap height (content scrolls)
