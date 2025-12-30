@@ -22,10 +22,11 @@ class GraphStore {
   /** Reference to UI store (set after initialization) */
   uiStore = null;
   
-  // Default size for new nodes (consistent initial size)
-  // Width should accommodate typical input, single-line height
+  // Default size for new nodes (used when creating/empty)
   static DEFAULT_NODE_WIDTH = 160;
   static DEFAULT_NODE_HEIGHT = 44;
+  // Minimum width for nodes with text (allows compact nodes)
+  static MIN_NODE_WIDTH = 60;
   // Max width for nodes before text wraps
   static MAX_NODE_WIDTH = 280;
 
@@ -233,13 +234,11 @@ class GraphStore {
     const prevState = node.state;
     node.state = state;
     
-    // Only recalculate size when exiting EDITABLE mode (to finalize size after editing)
-    // or when text is very long and needs height adjustment for truncation
     const wasEditable = prevState === NodeState.EDITABLE;
     const isExpanded = state === NodeState.ACTIVE || state === NodeState.EDITABLE;
     
-    // Recalculate when exiting editable mode to finalize the size
-    if (wasEditable && !isExpanded) {
+    // Recalculate when exiting editable mode (to fit node width to text)
+    if (wasEditable) {
       this.recalculateNodeSize(nodeId);
     }
     // Or when entering expanded mode with long text (for proper height)
@@ -279,9 +278,9 @@ class GraphStore {
     const verticalPadding = 24; // 12px top + 12px bottom
     const maxLinesWithoutScroll = 3;
     
-    // Padding: 16px horizontal, 12px vertical
-    // Width grows up to maxWidth, then wraps and height grows
-    node.w = Math.min(maxWidth, Math.max(GraphStore.DEFAULT_NODE_WIDTH, measured.width + 32));
+    // Padding: 16px horizontal (32px total), 12px vertical
+    // Width based on actual text size, with min/max constraints
+    node.w = Math.min(maxWidth, Math.max(GraphStore.MIN_NODE_WIDTH, measured.width + 32));
     
     if (isEditable) {
       // For editable state: grow up to 3 lines, then cap height (content scrolls)
