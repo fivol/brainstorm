@@ -1,0 +1,55 @@
+.graph-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: var(--canvas-bg);
+  cursor: default;
+  user-select: none;
+}
+
+.graph-canvas .node {
+  cursor: grab;
+}
+
+.graph-canvas .node:active {
+  cursor: grabbing;
+}
+
+.graph-canvas .node-bg {
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.1));
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+.graph-canvas .node:hover .node-bg {
+  stroke: var(--node-hover-border);
+}
+
+.graph-canvas .node-text-container {
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+.graph-canvas .node-text-container:focus {
+  outline: none;
+}
+
+.graph-canvas .node-text-container[contenteditable="true"] {
+  cursor: text;
+}
+
+.graph-canvas .edge-path {
+  transition: stroke 0.15s ease, stroke-width 0.15s ease;
+}
+
+.graph-canvas .edge:hover .edge-path {
+  stroke: var(--edge-hover-color);
+  stroke-width: 2;
+}
+
+.graph-canvas .edge-preview {
+  pointer-events: none;
+}
+
+.graph-canvas .selection-rect {
+  pointer-events: none;
+}

@@ -1,0 +1,149 @@
+/* CSS Custom Properties (Theme Variables) */
+:root {
+  /* Colors */
+  --canvas-bg: #f8f9fa;
+  --bg-color: #ffffff;
+  --bg-muted: #f1f3f4;
+  --panel-bg: #ffffff;
+  --controls-bg: rgba(255, 255, 255, 0.95);
+  --toast-bg: #ffffff;
+  
+  --text-color: #1a1a1a;
+  --text-secondary: #5f6368;
+  --text-muted: #9aa0a6;
+  
+  --border-color: #dadce0;
+  --border-light: #e8eaed;
+  
+  /* Node colors */
+  --node-bg: #ffffff;
+  --node-border: #dadce0;
+  --node-hover-border: #bdc1c6;
+  --node-active-border: #1a73e8;
+  --node-selected-border: #fbbc04;
+  
+  /* Edge colors */
+  --edge-color: #5f6368;
+  --edge-hover-color: #1a73e8;
+  --edge-selected-color: #1a73e8;
+  --edge-preview-color: #1a73e8;
+  
+  /* Selection */
+  --selection-fill: rgba(26, 115, 232, 0.1);
+  --selection-stroke: rgba(26, 115, 232, 0.5);
+  
+  /* Interactive */
+  --hover-bg: rgba(0, 0, 0, 0.05);
+  --active-bg: rgba(0, 0, 0, 0.1);
+  
+  /* Status colors */
+  --info-color: #1a73e8;
+  --warning-color: #f9ab00;
+  --error-color: #d93025;
+  
+  /* Keyboard */
+  --kbd-bg: #f1f3f4;
+  --kbd-border: #dadce0;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas-bg: #1e1e1e;
+    --bg-color: #2d2d2d;
+    --bg-muted: #3c3c3c;
+    --panel-bg: #2d2d2d;
+    --controls-bg: rgba(45, 45, 45, 0.95);
+    --toast-bg: #3c3c3c;
+    
+    --text-color: #e8eaed;
+    --text-secondary: #9aa0a6;
+    --text-muted: #5f6368;
+    
+    --border-color: #5f6368;
+    --border-light: #3c3c3c;
+    
+    --node-bg: #2d2d2d;
+    --node-border: #5f6368;
+    --node-hover-border: #9aa0a6;
+    --node-active-border: #8ab4f8;
+    --node-selected-border: #fdd663;
+    
+    --edge-color: #9aa0a6;
+    --edge-hover-color: #8ab4f8;
+    --edge-selected-color: #8ab4f8;
+    --edge-preview-color: #8ab4f8;
+    
+    --selection-fill: rgba(138, 180, 248, 0.15);
+    --selection-stroke: rgba(138, 180, 248, 0.5);
+    
+    --hover-bg: rgba(255, 255, 255, 0.08);
+    --active-bg: rgba(255, 255, 255, 0.15);
+    
+    --info-color: #8ab4f8;
+    --warning-color: #fdd663;
+    --error-color: #f28b82;
+    
+    --kbd-bg: #3c3c3c;
+    --kbd-border: #5f6368;
+  }
+}
+
+/* Reset and base */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-color);
+  background: var(--canvas-bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.app {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* Focus styles */
+:focus-visible {
+  outline: 2px solid var(--info-color);
+  outline-offset: 2px;
+}
+
+/* Selection */
+::selection {
+  background: rgba(26, 115, 232, 0.3);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

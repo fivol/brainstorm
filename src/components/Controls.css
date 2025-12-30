@@ -1,0 +1,62 @@
+.controls {
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--controls-bg);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+}
+
+.controls-group {
+  display: flex;
+  gap: 4px;
+}
+
+.controls-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border-color);
+  margin: 0 4px;
+}
+
+.control-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.control-btn:hover:not(:disabled) {
+  background: var(--hover-bg);
+}
+
+.control-btn:active:not(:disabled) {
+  background: var(--active-bg);
+}
+
+.control-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.control-btn-danger:hover:not(:disabled) {
+  color: var(--error-color);
+}
+
+.control-btn svg {
+  flex-shrink: 0;
+}
