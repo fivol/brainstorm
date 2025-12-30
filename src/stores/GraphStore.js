@@ -453,12 +453,12 @@ class GraphStore {
 
   /**
    * Clear the entire graph.
-   * Note: Does not clear the title - title persists across clears.
+   * Clears nodes, edges, title, and undo history.
    */
   clear() {
     this.nodes.clear();
     this.edges.clear();
-    // Don't clear title - it persists across clears
+    this.setTitle(''); // Clear title when graph is cleared
     if (this.undoStore) {
       this.undoStore.clear();
     }

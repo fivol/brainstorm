@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { observer } from 'mobx-react-lite';
 import { useStores } from '../stores';
 import { CanvasRenderer } from '../canvas/CanvasRenderer';
@@ -12,10 +12,10 @@ import './Canvas.css';
  * Integrates D3 rendering with React and MobX.
  */
 const Canvas = observer(function Canvas() {
-  const { graphStore, uiStore, undoStore, aiStore } = useStores();
+  const { graphStore, uiStore, undoStore } = useStores();
   
-  // Virtual cards selection state
-  const [selectedVirtualCard, setSelectedVirtualCard] = useState(null);
+  // Virtual cards selection state (currently disabled)
+  // const [selectedVirtualCard, setSelectedVirtualCard] = useState(null);
   const svgRef = useRef(null);
   const rendererRef = useRef(null);
   const simulationRef = useRef(null);
@@ -107,6 +107,11 @@ const Canvas = observer(function Canvas() {
     
     // Handle create new node event (from plus button)
     const handleCreateNewNode = () => {
+      // Don't create new node if there's already an active node
+      if (uiStore.activeNodeId) {
+        return;
+      }
+      
       // Create new node in center of view, finding free space
       const { x, y, scale } = uiStore.view;
       const centerX = (renderer.width / 2 - x) / scale;
@@ -522,28 +527,29 @@ const Canvas = observer(function Canvas() {
     
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
     
-    // Clear virtual cards on most actions (except navigation within them)
-    const shouldClearVirtualCards = !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' '].includes(event.key);
-    if (shouldClearVirtualCards && aiStore.virtualCards.length > 0 && !(event.ctrlKey && event.key === ' ')) {
-      aiStore.clearVirtualCards();
-      setSelectedVirtualCard(null);
-    }
+    // Clear virtual cards on most actions (except navigation within them) - currently disabled
+    // const shouldClearVirtualCards = !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' '].includes(event.key);
+    // if (shouldClearVirtualCards && aiStore.virtualCards.length > 0 && !(event.ctrlKey && event.key === ' ')) {
+    //   aiStore.clearVirtualCards();
+    //   setSelectedVirtualCard(null);
+    // }
     
-    // Ctrl+Space - trigger AI suggestions
+    // Ctrl+Space - trigger AI suggestions (currently disabled)
     if ((event.ctrlKey || event.metaKey) && event.key === ' ') {
       event.preventDefault();
-      if (activeNode && activeNode.state !== NodeState.EDITABLE && aiStore.isConfigured) {
-        aiStore.generateSuggestions(graphStore, activeNode.id, 3);
-        setSelectedVirtualCard(0);
-      } else if (!aiStore.isConfigured) {
-        aiStore.openModal();
-        uiStore.info('Configure AI to get suggestions');
-      }
+      // Virtual cards feature is currently disabled
+      // if (activeNode && activeNode.state !== NodeState.EDITABLE && aiStore.isConfigured) {
+      //   aiStore.generateSuggestions(graphStore, activeNode.id, 3);
+      //   setSelectedVirtualCard(0);
+      // } else if (!aiStore.isConfigured) {
+      //   aiStore.openModal();
+      //   uiStore.info('Configure AI to get suggestions');
+      // }
       return;
     }
     
-    // Handle virtual cards navigation and selection
-    if (aiStore.virtualCards.length > 0 && activeNode && activeNode.state === NodeState.ACTIVE) {
+    // Handle virtual cards navigation and selection (currently disabled)
+    /* if (aiStore.virtualCards.length > 0 && activeNode && activeNode.state === NodeState.ACTIVE) {
       const cards = aiStore.virtualCards;
       
       // Arrow navigation between virtual cards
@@ -613,7 +619,7 @@ const Canvas = observer(function Canvas() {
         setSelectedVirtualCard(null);
         return;
       }
-    }
+    } */
     
     // Global shortcuts
     if ((event.metaKey || event.ctrlKey) && event.key === 'z') {
@@ -716,6 +722,12 @@ const Canvas = observer(function Canvas() {
           uiStore.exitEditable(activeNode.id);
           graphStore.recalculateNodeSize(activeNode.id);
         }
+      }
+      
+      // Don't create new node if there's already an active node
+      if (uiStore.activeNodeId) {
+        event.preventDefault();
+        return;
       }
       
       // Create new node in center of view, finding free space
@@ -969,8 +981,8 @@ const Canvas = observer(function Canvas() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // Handle virtual card click
-  const handleVirtualCardClick = useCallback((cardIndex) => {
+  // Handle virtual card click (currently disabled)
+  /* const handleVirtualCardClick = useCallback((cardIndex) => {
     const card = aiStore.virtualCards[cardIndex];
     if (!card) return;
     
@@ -1011,10 +1023,10 @@ const Canvas = observer(function Canvas() {
     
     rendererRef.current.centerOnNode(newNode.id);
     rendererRef.current.render();
-  }, [graphStore, uiStore, aiStore]);
+  }, [graphStore, uiStore, aiStore]); */
 
-  // Calculate virtual card positions
-  const getVirtualCardPositions = useCallback(() => {
+  // Calculate virtual card positions (currently disabled)
+  /* const getVirtualCardPositions = useCallback(() => {
     if (aiStore.virtualCards.length === 0) return [];
     
     const activeNode = graphStore.getNode(uiStore.activeNodeId);
@@ -1052,7 +1064,7 @@ const Canvas = observer(function Canvas() {
     });
   }, [graphStore, uiStore, aiStore.virtualCards]);
 
-  const virtualCardPositions = getVirtualCardPositions();
+  const virtualCardPositions = getVirtualCardPositions(); */
 
   return (
     <>
@@ -1066,10 +1078,9 @@ const Canvas = observer(function Canvas() {
         onMouseLeave={handleCanvasMouseUp}
       />
       
-      {/* Virtual Cards Overlay */}
-      {virtualCardPositions.length > 0 && (
+      {/* Virtual Cards Overlay - Hidden */}
+      {/* {virtualCardPositions.length > 0 && (
         <div className="virtual-cards-overlay">
-          {/* Curved dotted arrows */}
           <svg className="virtual-arrows-svg">
             <defs>
               <marker
@@ -1101,7 +1112,6 @@ const Canvas = observer(function Canvas() {
             })}
           </svg>
           
-          {/* Virtual cards */}
           {virtualCardPositions.map((card, index) => (
             <div
               key={card.id}
@@ -1120,7 +1130,6 @@ const Canvas = observer(function Canvas() {
             </div>
           ))}
           
-          {/* Loading indicator */}
           {aiStore.loadingSuggestions && (
             <div className="virtual-cards-loading">
               <span className="virtual-spinner" />
@@ -1128,7 +1137,7 @@ const Canvas = observer(function Canvas() {
             </div>
           )}
         </div>
-      )}
+      )} */}
     </>
   );
 });
